@@ -43,12 +43,15 @@ class FourierUnit(nn.Module):
 
     def forward(self, x):
         batch, c, h, w = x.size()
-
-        fft_dim = (-3, -2, -1) if self.ffc3d else (-2, -1)
-        ffted = torch.fft.rfftn(x, dim=fft_dim, norm=self.fft_norm)
+        print(x.size())
+        # fft_dim = (-3, -2, -1) if self.ffc3d else (-2, -1)
+        fft_dim = (-2, -1)
+        ffted = torch.fft.rfftn(x, dim=fft_dim)
         ffted = torch.stack((ffted.real, ffted.imag), dim=-1)
         ffted = ffted.permute(0, 1, 4, 2, 3).contiguous()  # (batch, c, 2, h, w/2+1)
         ffted = ffted.view((batch, -1,) + ffted.size()[3:])
+
+        print(ffted.size())
 
         ffted = self.conv_layer(ffted)  # (batch, c*2, h, w/2+1)
         ffted = self.relu(self.bn(ffted))
@@ -56,8 +59,9 @@ class FourierUnit(nn.Module):
         ffted = ffted.view((batch, -1, 2,) + ffted.size()[2:]).permute(0, 1, 3, 4,
                                                                        2).contiguous()  # (batch,c, t, h, w/2+1, 2)
         ffted = torch.complex(ffted[..., 0], ffted[..., 1])
-        ifft_shape_slice = x.shape[-3:] if self.ffc3d else x.shape[-2:]
-        output = torch.fft.irfftn(ffted, s=ifft_shape_slice, dim=fft_dim, norm=self.fft_norm)
+        # ifft_shape_slice = x.shape[-3:] if self.ffc3d else x.shape[-2:]
+        ifft_shape_slice = x.shape[-2:]
+        output = torch.fft.irfftn(ffted, s=ifft_shape_slice, dim=fft_dim)
 
         return output
 
@@ -89,17 +93,22 @@ class SpectralTransform(nn.Module):
         self.conv2 = torch.nn.Conv2d(out_channels // 2, out_channels, kernel_size=(1, 1), groups=groups, bias=False)
 
     def forward(self, x):
-
+        print("input x size at SpectralTransform", x.size())
         x = self.down_sample(x)
         x = self.conv1(x)
+
         output = self.fu(x)
 
         if self.enable_lfu:
             n, c, h, w = x.shape
+            print("lfu x size at SpectralTransform", x.shape)
             split_no = 2
             split_s = h // split_no
+            split_s_w = w // split_no
             xs = torch.cat(torch.split(x[:, :c // 4], split_s, dim=-2), dim=1).contiguous()
-            xs = torch.cat(torch.split(xs, split_s, dim=-1), dim=1).contiguous()
+            # xs = torch.cat(torch.split(xs, split_s, dim=-1), dim=1).contiguous()
+            xs = torch.cat(torch.split(xs, split_s_w, dim=-1), dim=1).contiguous()
+            print("xs size at SpectralTransform", xs.size())
             xs = self.lfu(xs)
             xs = xs.repeat(1, 1, split_no, split_no).contiguous()
         else:
@@ -124,6 +133,11 @@ class FFC(nn.Module):
         in_cl = in_channels - in_cg
         out_cg = int(out_channels * ratio_gout)
         out_cl = out_channels - out_cg
+
+        print("in_cg", in_cg)
+        print("in_cl", in_cl)
+        print("out_cg", out_cg)
+        print("out_cl", out_cl)
         # groups_g = 1 if groups == 1 else int(groups * ratio_gout)
         # groups_l = 1 if groups == 1 else groups - groups_g
 
@@ -141,6 +155,7 @@ class FFC(nn.Module):
 
         module = nn.Identity if in_cg == 0 or out_cg == 0 else SpectralTransform
         self.conv_g2g = module(in_cg, out_cg, stride, 1 if groups == 1 else groups // 2, enable_lfu)
+        # self.conv_g2g = module(in_cg, out_cg, stride, 1 if groups == 1 else groups // 2, False)
 
     def forward(self, x):
         x_l, x_g = x if type(x) is tuple else (x, 0)
