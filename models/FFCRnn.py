@@ -31,7 +31,8 @@ class FFCRnn(nn.Module):
         kernel_sizes = [3, 3, 3, 3, 3, 3, 2]
         padding_sizes = [1, 1, 1, 1, 1, 1, 0]
         stride_sizes = [1, 1, 1, 1, 1, 1, 1]
-        nm = [64, 128, 256, 256, 512, 512, 512]
+        # nm = [64, 128, 256, 256, 512, 512, 512]
+        nm = [32, 32, 48, 64, 80, 512, 512]
 
         cnn = nn.Sequential()
 
@@ -56,18 +57,24 @@ class FFCRnn(nn.Module):
                 cnn.add_module('relu{0}'.format(i), nn.ReLU(True))
 
         conv_relu(0)
-        cnn.add_module('pooling{0}'.format(0), nn.MaxPool2d(2, 2))  # 64x16x64
+        cnn.add_module('pooling{0}'.format(0), nn.MaxPool2d(2, 2))  # 64 x 16 x64
         conv_relu(1)
-        cnn.add_module('pooling{0}'.format(1), nn.MaxPool2d(2, 2))  # 128x8x32
-        conv_relu(2, True)
+        cnn.add_module('pooling{0}'.format(1), nn.MaxPool2d(2, 2))  # 128 x 8 x 32
+        conv_relu(2)
+        cnn.add_module('pooling{0}'.format(2), nn.MaxPool2d((2, 1)))  # 128 x 8 x 32
         conv_relu(3)
-        cnn.add_module('pooling{0}'.format(2), nn.MaxPool2d((2, 2), (2, 1), (0, 1)))  # 256x4x16
-        conv_relu(4, True)
-        conv_relu(5)
-        cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((2, 2), (2, 1), (0, 1)))  # 512x2x16
-        conv_relu(6, True)  # 512x1x16
+        cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((1, 2)))  # 256 x 4 x 16
+        conv_relu(4)
+        # cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((1, 2)))
+
+        # conv_relu(5)
+        # cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((2, 2), (2, 1), (0, 1)))  # 512 x 2 x 16
+        # conv_relu(6, True)  # 512 x 1 x 16
 
         self.cnn = cnn
+
+        self.adp = nn.AdaptiveAvgPool2d((None, 512))
+
         self.rnn = nn.Sequential(
             BidirectionalLSTM(512, nh, nh),
             BidirectionalLSTM(nh, nh, output_number))
@@ -75,12 +82,26 @@ class FFCRnn(nn.Module):
     def forward(self, x):
         # conv features
         conv = self.cnn(x)
+
         b, c, h, w = conv.size()
-        assert h == 1, "the height of conv must be 1"
-        conv = conv.squeeze(2)
+        # print(b, c, h, w)
+        # assert h == 1, "the height of conv must be 1"
+        print(conv.size())
+        # conv = conv.squeeze(2)
+        conv = conv.view(b, c * h, w)
+        print(conv.size())
         conv = conv.permute(2, 0, 1)  # [w, b, c]
 
+        conv = self.adp(conv)
+        print(conv.size())
         # rnn features
         output = self.rnn(conv)
 
         return output
+
+
+if __name__ == '__main__':
+    # ffc_rnn = FFCRnn(32, 32, 32, 32)
+    ffc_rnn = FFCRnn(32, 1, 64, 64)
+    tensor = torch.zeros([10, 1, 32, 256], dtype=torch.float32)
+    res = ffc_rnn(tensor)

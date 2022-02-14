@@ -26,6 +26,7 @@ class BasicBlock(nn.Module):
                 "Dilation > 1 not supported in BasicBlock")
 
         width = int(planes * (base_width / 64.)) * groups
+
         # Both self.conv2 and self.down_sample layers down_sample the input when
         # stride != 1
 
@@ -50,7 +51,7 @@ class BasicBlock(nn.Module):
         id_l, id_g = x if self.down_sample is None else self.down_sample(x)
 
         x = self.conv1(x)
-        x_l, x_g = self.conv2(x)
+        # x_l, x_g = self.conv2(x)
         x_l, x_g = self.se_block(x)
 
         x_l = self.relu_l(x_l + id_l)
@@ -123,7 +124,8 @@ class FFCResNet(nn.Module):
         self.base_width = width_per_group
         self.lfu = lfu
         self.use_se = use_se
-        self.conv1 = nn.Conv2d(3, in_planes, kernel_size=(7, 7), stride=(2, 2), padding=3, bias=False)
+        # self.conv1 = nn.Conv2d(3, in_planes, kernel_size=(7, 7), stride=(2, 2), padding=3, bias=False)
+        self.conv1 = nn.Conv2d(1, in_planes, kernel_size=(7, 7), stride=(2, 2), padding=3, bias=False)
         self.bn1 = norm_layer(in_planes)
         self.relu = nn.ReLU(inplace=True)
         self.max_pool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -158,6 +160,7 @@ class FFCResNet(nn.Module):
     def _make_layer(self, block, planes, blocks, stride=1, ratio_gin=0.5, ratio_gout=0.5):
         norm_layer = self._norm_layer
         down_sample = None
+
         if stride != 1 or self.in_planes != planes * block.expansion or ratio_gin == 0:
             down_sample = FfcBnAct(self.in_planes, planes * block.expansion, kernel_size=(1, 1), stride=stride,
                                    ratio_gin=ratio_gin, ratio_gout=ratio_gout, enable_lfu=self.lfu)
@@ -175,10 +178,13 @@ class FFCResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
+
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
         x = self.max_pool(x)
+
+        print(x.size())
 
         x = self.layer1(x)
         x = self.layer2(x)
@@ -281,3 +287,27 @@ def ffc_resnext101_32x8d(pretrained=False, **kwargs):
     model = FFCResNet(Bottleneck, [3, 4, 32, 3], **kwargs)
 
     return model
+
+
+if __name__ == '__main__':
+    model = ffc_resnet18()
+    # model = ffc_resnet26()
+    print("++++++++++++++++++++++++++")
+    # tensor = torch.zeros([10, 1, 256, 256], dtype=torch.float32)
+    tensor = torch.zeros([10, 1, 32, 256], dtype=torch.float32)
+    res = model(tensor)
+
+    # x = torch.zeros([10, 16, 64, 64], dtype=torch.float32)
+    # x = torch.zeros([10, 16, 8, 64], dtype=torch.float32)
+    # n, c, h, w = x.shape
+    # print("lfu x size ", x.shape)
+    # split_no = 2
+    # split_s = h // split_no
+    #
+    # split = torch.split(x[:, :c // 4], split_s, dim=-2)
+    # print("xs size after split", split[0].size())
+    # print("xs size after split", split[1].size())
+    # xs = torch.cat(split, dim=1).contiguous()
+    # print("xs size after concat", xs.shape)
+    # xs = torch.cat(torch.split(xs, (w // split_no), dim=-1), dim=1).contiguous()
+    # print("xs final size", xs.size())
