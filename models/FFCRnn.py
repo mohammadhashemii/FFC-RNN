@@ -1,7 +1,8 @@
 import torch.nn as nn
-from FFC import *
+#from FFC import *
 import torch.nn.functional as F
-
+import numpy as np
+import torch
 
 class BidirectionalLSTM(nn.Module):
 
@@ -93,24 +94,24 @@ class FFCRnn(nn.Module):
         b, c, h, w = conv.size()
         # print(b, c, h, w)
         # assert h == 1, "the height of conv must be 1"
-        print(conv.size())
+        #print(conv.size())
         # conv = conv.squeeze(2)
         conv = conv.view(b, c * h, w)
-        print(conv.size())
+        #print(conv.size())
 
         conv = self.adp(conv)
 
         conv = conv.permute(2, 0, 1)  # [w, b, c]
 
-        print(conv.size())
+        #print(conv.size())
         # rnn features
         output = self.rnn(conv)
-        print(conv.size())
+        #print(conv.size())
         output = torch.stack([F.log_softmax(self.fc(output[i]), dim=-1) for i in range(output.shape[0])])
 
         # in order to be compatible with our ctc
         output = output.permute(1, 0, 2)  # (batch, ctc input length, output number)
-        print(output.size())
+        #print(output.size())
         return output
 
 
@@ -119,3 +120,7 @@ if __name__ == '__main__':
     ffc_rnn = FFCRnn(32, 1, 41, 256)
     tensor = torch.zeros([10, 1, 32, 256], dtype=torch.float32)
     res = ffc_rnn(tensor)
+    #ffc_rnn = FFCRnn(32, 1, 64, 64)
+    #tensor = torch.zeros([10, 1, 32, 256], dtype=torch.float32)
+    #res = ffc_rnn(tensor)
+    print(np.ones(55) * 32)

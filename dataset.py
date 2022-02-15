@@ -26,7 +26,7 @@ class SadriDataset(Dataset):
         self.paths_and_labels = self._get_paths_and_labels()
         if is_training_set:
             self.max_len, self.word_vocab = self._create_words_vocab(self.paths_and_labels['labels_list'])
-            self.wv = WordVocabulary(word_vocab=self.word_vocab, max_len = self.max_len)
+            self.wv = WordVocabulary(word_vocab=self.word_vocab, max_len=self.max_len)
         self.img_w, self.img_h = img_size
         self.num_samples = len(self.paths_and_labels['labels_list'])
 
