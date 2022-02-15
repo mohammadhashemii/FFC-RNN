@@ -178,6 +178,7 @@ class FFCResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
+        print("input size in ffcResnet", x.size())
 
         x = self.conv1(x)
         x = self.bn1(x)
@@ -191,8 +192,15 @@ class FFCResNet(nn.Module):
         x = self.layer3(x)
         x = self.layer4(x)
 
+        print("after layers size in ffcResnet", x[0].size())
+        print(x[1])
+
         x = self.avg_pool(x[0])
         x = x.view(x.size(0), -1)
+
+        print("after layers 2 size in ffcResnet", x[0].size())
+        # print(x[1])
+
         x = self.fc(x)
 
         return x
