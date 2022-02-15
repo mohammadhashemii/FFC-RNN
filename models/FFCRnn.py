@@ -1,22 +1,27 @@
 import torch.nn as nn
 from FFC import *
+import torch.nn.functional as F
 
 
 class BidirectionalLSTM(nn.Module):
 
-    def __init__(self, input_size, hidden_size, out_features):
+    def __init__(self, input_size, hidden_size, out_features, return_seq=True):
         super(BidirectionalLSTM, self).__init__()
 
         self.rnn = nn.LSTM(input_size, hidden_size, bidirectional=True)
         self.embedding = nn.Linear(hidden_size * 2, out_features)
+        self.return_seq = return_seq
 
     def forward(self, x):
         recurrent, _ = self.rnn(x)
         t, b, h = recurrent.size()
         t_rec = recurrent.view(t * b, h)
 
-        output = self.embedding(t_rec)  # [t * b, nOut]
-        output = output.view(t, b, -1)
+        if self.return_seq:
+            output = self.embedding(t_rec)  # [t * b, nOut]
+            output = output.view(t, b, -1)
+        else:
+            output = t_rec.view(t, b, -1)
 
         return output
 
@@ -73,11 +78,13 @@ class FFCRnn(nn.Module):
 
         self.cnn = cnn
 
-        self.adp = nn.AdaptiveAvgPool2d((None, 512))
+        self.adp = nn.AdaptiveAvgPool2d((512, None))
 
         self.rnn = nn.Sequential(
             BidirectionalLSTM(512, nh, nh),
-            BidirectionalLSTM(nh, nh, output_number))
+            BidirectionalLSTM(nh, nh, output_number, return_seq=False))
+
+        self.fc = nn.Linear(nh * 2, output_number)
 
     def forward(self, x):
         # conv features
@@ -90,18 +97,25 @@ class FFCRnn(nn.Module):
         # conv = conv.squeeze(2)
         conv = conv.view(b, c * h, w)
         print(conv.size())
-        conv = conv.permute(2, 0, 1)  # [w, b, c]
 
         conv = self.adp(conv)
+
+        conv = conv.permute(2, 0, 1)  # [w, b, c]
+
         print(conv.size())
         # rnn features
         output = self.rnn(conv)
+        print(conv.size())
+        output = torch.stack([F.log_softmax(self.fc(output[i]), dim=-1) for i in range(output.shape[0])])
 
+        # in order to be compatible with our ctc
+        output = output.permute(1, 0, 2)  # (batch, ctc input length, output number)
+        print(output.size())
         return output
 
 
 if __name__ == '__main__':
     # ffc_rnn = FFCRnn(32, 32, 32, 32)
-    ffc_rnn = FFCRnn(32, 1, 64, 64)
+    ffc_rnn = FFCRnn(32, 1, 41, 256)
     tensor = torch.zeros([10, 1, 32, 256], dtype=torch.float32)
     res = ffc_rnn(tensor)

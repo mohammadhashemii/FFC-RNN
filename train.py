@@ -43,7 +43,7 @@ n_train = len(train_dataset)
 
 # create the model
 ffc_rnn = FFCRnn(image_height=args.imgH,
-                 nc=1, # since the images are black and white
+                 nc=1,  # since the images are black and white
                  nh=16,
                  n_rnn=4,
                  leaky_relu=True)
@@ -58,7 +58,7 @@ epoch_train_loss_list = []
 epoch_val_loss_list = []
 for epoch in range(args.n_epochs):
     ffc_rnn.train()
-    with tqdm(total=n_train, desc=f"Epoch {epoch+1}/{args.n_epochs}", unit='img') as pbar:
+    with tqdm(total=n_train, desc=f"Epoch {epoch + 1}/{args.n_epochs}", unit='img') as pbar:
         for batch in train_loader:
             images = batch['image'].to(device=device, dtype=torch.float32)
             labels = batch['label'].to(device=device, dtype=torch.int)
