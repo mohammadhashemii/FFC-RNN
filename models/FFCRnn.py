@@ -1,8 +1,9 @@
 import torch.nn as nn
-#from FFC import *
+# from FFC import *
 import torch.nn.functional as F
 import numpy as np
 import torch
+
 
 class BidirectionalLSTM(nn.Module):
 
@@ -29,7 +30,7 @@ class BidirectionalLSTM(nn.Module):
 
 class FFCRnn(nn.Module):
 
-    def __init__(self, image_height, nc, output_number, nh, n_rnn=2, leaky_relu=False):
+    def __init__(self, image_height, nc, output_number, nh, n_rnn=2, leaky_relu=False, map_to_seq_hidden=64):
         super(FFCRnn, self).__init__()
 
         assert image_height % 16 == 0, 'imgH has to be a multiple of 16'
@@ -63,55 +64,62 @@ class FFCRnn(nn.Module):
                 cnn.add_module('relu{0}'.format(i), nn.ReLU(True))
 
         conv_relu(0)
-        cnn.add_module('pooling{0}'.format(0), nn.MaxPool2d(2, 2))  # 64 x 16 x64
+        cnn.add_module('pooling{0}'.format(0), nn.MaxPool2d(2, 2))  # (64, img_height // 2, img_width // 2)
         conv_relu(1)
-        cnn.add_module('pooling{0}'.format(1), nn.MaxPool2d(2, 2))  # 128 x 8 x 32
+        cnn.add_module('pooling{0}'.format(1), nn.MaxPool2d(2, 2))  # (128, img_height // 4, img_width // 4)
         conv_relu(2)
-        cnn.add_module('pooling{0}'.format(2), nn.MaxPool2d((2, 1)))  # 128 x 8 x 32
+        cnn.add_module('pooling{0}'.format(2), nn.MaxPool2d((2, 1)))  # (256, img_height // 8, img_width // 4)
         conv_relu(3)
         cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((1, 2)))  # 256 x 4 x 16
         conv_relu(4)
-        # cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((1, 2)))
 
+        # cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((1, 2)))
         # conv_relu(5)
         # cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((2, 2), (2, 1), (0, 1)))  # 512 x 2 x 16
         # conv_relu(6, True)  # 512 x 1 x 16
 
         self.cnn = cnn
+        #
+        # self.adp = nn.AdaptiveAvgPool2d((512, None))
+        #
+        # self.rnn = nn.Sequential(
+        #     BidirectionalLSTM(512, nh, nh),
+        #     BidirectionalLSTM(nh, nh, output_number, return_seq=False))
 
-        self.adp = nn.AdaptiveAvgPool2d((512, None))
+        output_channel = 80
+        output_height = 4
 
-        self.rnn = nn.Sequential(
-            BidirectionalLSTM(512, nh, nh),
-            BidirectionalLSTM(nh, nh, output_number, return_seq=False))
+        self.map_to_seq = nn.Linear(output_channel * output_height, map_to_seq_hidden)
+
+        self.rnn1 = nn.LSTM(map_to_seq_hidden, nh, bidirectional=True)
+        self.rnn2 = nn.LSTM(2 * nh, nh, bidirectional=True)
 
         self.fc = nn.Linear(nh * 2, output_number)
 
     def forward(self, x):
         # conv features
         conv = self.cnn(x)
-
         b, c, h, w = conv.size()
-        # print(b, c, h, w)
-        # assert h == 1, "the height of conv must be 1"
-        #print(conv.size())
-        # conv = conv.squeeze(2)
         conv = conv.view(b, c * h, w)
-        #print(conv.size())
+        # conv = self.adp(conv)
+        conv = conv.permute(2, 0, 1)  # (width, batch, feature)
 
-        conv = self.adp(conv)
-
-        conv = conv.permute(2, 0, 1)  # [w, b, c]
-
-        #print(conv.size())
         # rnn features
-        output = self.rnn(conv)
-        #print(conv.size())
-        output = torch.stack([F.log_softmax(self.fc(output[i]), dim=-1) for i in range(output.shape[0])])
+        # output = self.rnn(conv)
+        # output = torch.stack([F.log_softmax(self.fc(output[i]), dim=-1) for i in range(output.shape[0])])
+        # print(conv.size())
+        seq = self.map_to_seq(conv)
+        # print(seq.size())
+        recurrent, _ = self.rnn1(seq)
+        # print(recurrent.size())
+        recurrent, _ = self.rnn2(recurrent)
+
+        # shape: (seq_len, batch, num_class)
+        output = self.fc(recurrent)
 
         # in order to be compatible with our ctc
-        output = output.permute(1, 0, 2)  # (batch, ctc input length, output number)
-        #print(output.size())
+        # output = output.permute(1, 0, 2)  # (batch, ctc input length, output number)
+        # print(output.size())
         return output
 
 
@@ -120,7 +128,6 @@ if __name__ == '__main__':
     ffc_rnn = FFCRnn(32, 1, 41, 256)
     tensor = torch.zeros([10, 1, 32, 256], dtype=torch.float32)
     res = ffc_rnn(tensor)
-    #ffc_rnn = FFCRnn(32, 1, 64, 64)
-    #tensor = torch.zeros([10, 1, 32, 256], dtype=torch.float32)
-    #res = ffc_rnn(tensor)
-    print(np.ones(55) * 32)
+    # ffc_rnn = FFCRnn(32, 1, 64, 64)
+    # tensor = torch.zeros([10, 1, 32, 256], dtype=torch.float32)
+    # res = ffc_rnn(tensor)
