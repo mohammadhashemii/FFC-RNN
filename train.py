@@ -16,8 +16,8 @@ parser.add_argument('--data_root', default='data', help='path to dataset directo
 parser.add_argument('--exp_dir', default='experiments', help='path to experiments directory')
 # training
 parser.add_argument('--exp', required=True, type=str, help='experiments number e.g. 01')
-parser.add_argument('--n_epochs', default=100, help='number of epochs for training')
-parser.add_argument('--batch_size', default=8, help='batch size')
+parser.add_argument('--n_epochs', type=int, default=100, help='number of epochs for training')
+parser.add_argument('--batch_size', type=int, default=128, help='batch size')
 parser.add_argument('--imgH', type=int, default=32, help='input image height')
 parser.add_argument('--imgW', type=int, default=256, help='input image width')
 parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate')
@@ -67,11 +67,11 @@ with open(json_path, "w") as jf:
     json.dump(training_configs, jf)
 print(f"Training configs:\n {training_configs}")
 
-model_summary = summary(ffc_rnn, (1, args.imgH, args.imgW), batch_size=-1, device='cuda')
-model_summary_path = os.path.join(args.exp_dir, args.exp, f"model_summary.txt")
-with open(model_summary, "w") as f:
-    f.write(model_summary)
-    f.close()
+#model_summary = summary(ffc_rnn, (1, args.imgH, args.imgW), batch_size=-1, device='cuda')
+#model_summary_path = os.path.join(args.exp_dir, args.exp, f"model_summary.txt")
+#with open(model_summary, "w") as f:
+#    f.write(model_summary)
+#    f.close()
 
 # training
 epoch_train_loss_list = []
@@ -100,7 +100,7 @@ for epoch in range(args.n_epochs):
             labels = batch['label'].to(device=device, dtype=torch.int)
             with torch.no_grad():
                 preds = ffc_rnn(images)
-                val_loss = None
+                val_loss = compute_ctc_loss(preds, labels)
                 epoch_val_loss_list.append(val_loss)
         avg_val_loss = torch.mean(torch.tensor(epoch_val_loss_list))
 
