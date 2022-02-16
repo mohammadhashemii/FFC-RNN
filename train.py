@@ -87,21 +87,25 @@ for epoch in range(args.n_epochs):
             images = batch['image'].to(device=device, dtype=torch.float32)  # (batch, c=1, imgH, imgW)
             labels = batch['label'].to(device=device, dtype=torch.int)
 
+            print(torch.count_nonzero(images))
+            print("--------------------")
             preds = ffc_rnn(images)
+            # print(preds)
+            # print("--------------------")
             log_probs = F.log_softmax(preds, dim=2)
-            loss = compute_ctc_loss(log_probs, labels).item()
+            loss = compute_ctc_loss(log_probs, labels)
+            print(loss)
+            # decoded_preds = ctc_decode(log_probs, 0, SadriDataset)
+            # target_lengths = torch.IntTensor([len(t) for t in labels])
 
-            decoded_preds = ctc_decode(log_probs, blank=0)
-            target_lengths = torch.IntTensor([len(t) for t in labels])
-
-            target_length_counter = 0
-            for pred, target_length in zip(decoded_preds, target_lengths):
-                real = labels[target_length_counter:target_length_counter + target_length]
-                target_length_counter += target_length
-                if pred == real:
-                    tot_correct += 1
-                else:
-                    wrong_cases.append((real, pred))
+            # target_length_counter = 0
+            # for pred, target_length in zip(decoded_preds, target_lengths):
+            #     real = labels[target_length_counter:target_length_counter + target_length]
+            #     target_length_counter += target_length
+            #     if pred == real:
+            #         tot_correct += 1
+            #     else:
+            #         wrong_cases.append((real, pred))
 
             tot_count += images.size(0)
             epoch_train_loss_list.append(loss)
@@ -128,7 +132,7 @@ for epoch in range(args.n_epochs):
                 log_probs = F.log_softmax(preds, dim=2)
                 val_loss = compute_ctc_loss(log_probs, labels).item()
 
-                decoded_preds = ctc_decode(log_probs, blank=0)
+                decoded_preds = ctc_decode(log_probs, 0, SadriDataset)
                 target_lengths = torch.IntTensor([len(t) for t in labels])
 
                 target_length_counter = 0
