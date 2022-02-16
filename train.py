@@ -8,7 +8,9 @@ from dataset import SadriDataset
 from tqdm import tqdm
 from models.FFCRnn import FFCRnn
 from losses.CTC_loss import compute_ctc_loss
-from torchsummary import summary
+# from torchsummary import summary
+from utils import ctc_decode
+import torch.nn.functional as F
 
 parser = argparse.ArgumentParser()
 # directories
@@ -43,7 +45,6 @@ train_loader = DataLoader(train_dataset, shuffle=False, **loader_args)
 test_loader = DataLoader(test_dataset, shuffle=False, **loader_args)
 n_train = len(train_dataset)
 
-
 # create the model
 ffc_rnn = FFCRnn(image_height=args.imgH,
                  nc=1,  # since the images are black and white
@@ -67,9 +68,9 @@ with open(json_path, "w") as jf:
     json.dump(training_configs, jf)
 print(f"Training configs:\n {training_configs}")
 
-#model_summary = summary(ffc_rnn, (1, args.imgH, args.imgW), batch_size=-1, device='cuda')
-#model_summary_path = os.path.join(args.exp_dir, args.exp, f"model_summary.txt")
-#with open(model_summary, "w") as f:
+# model_summary = summary(ffc_rnn, (1, args.imgH, args.imgW), batch_size=-1, device='cuda')
+# model_summary_path = os.path.join(args.exp_dir, args.exp, f"model_summary.txt")
+# with open(model_summary, "w") as f:
 #    f.write(model_summary)
 #    f.close()
 
@@ -77,37 +78,79 @@ print(f"Training configs:\n {training_configs}")
 epoch_train_loss_list = []
 epoch_val_loss_list = []
 for epoch in range(args.n_epochs):
+
     ffc_rnn.train()
+    tot_correct = 0
+    tot_count = 0
     with tqdm(total=n_train, desc=f"Epoch {epoch + 1}/{args.n_epochs}", unit='img') as pbar:
         for batch in train_loader:
             images = batch['image'].to(device=device, dtype=torch.float32)  # (batch, c=1, imgH, imgW)
             labels = batch['label'].to(device=device, dtype=torch.int)
 
             preds = ffc_rnn(images)
+            log_probs = F.log_softmax(preds, dim=2)
+            loss = compute_ctc_loss(log_probs, labels).item()
 
-            loss = compute_ctc_loss(preds, labels)
+            decoded_preds = ctc_decode(log_probs, blank=0)
+            target_lengths = torch.IntTensor([len(t) for t in labels])
+
+            target_length_counter = 0
+            for pred, target_length in zip(decoded_preds, target_lengths):
+                real = labels[target_length_counter:target_length_counter + target_length]
+                target_length_counter += target_length
+                if pred == real:
+                    tot_correct += 1
+                else:
+                    wrong_cases.append((real, pred))
+
+            tot_count += images.size(0)
             epoch_train_loss_list.append(loss)
+
             ffc_rnn.zero_grad()
             loss.backward()
             optimizer.step()
             pbar.update(images.shape[0])
-        avg_train_loss = torch.mean(torch.tensor(epoch_train_loss_list))
+        # avg_train_loss = torch.mean(torch.tensor(epoch_train_loss_list))
+        avg_train_loss = loss / tot_correct
+        train_accuracy = tot_correct / tot_count
 
         # validation
         ffc_rnn.eval()
+        tot_correct = 0
+        tot_count = 0
+        wrong_cases = []
         for batch in test_loader:
             images = batch['image'].to(device=device, dtype=torch.float32)
             labels = batch['label'].to(device=device, dtype=torch.int)
             with torch.no_grad():
                 preds = ffc_rnn(images)
-                val_loss = compute_ctc_loss(preds, labels)
+
+                log_probs = F.log_softmax(preds, dim=2)
+                val_loss = compute_ctc_loss(log_probs, labels).item()
+
+                decoded_preds = ctc_decode(log_probs, blank=0)
+                target_lengths = torch.IntTensor([len(t) for t in labels])
+
+                target_length_counter = 0
+                for pred, target_length in zip(decoded_preds, target_lengths):
+                    real = labels[target_length_counter:target_length_counter + target_length]
+                    target_length_counter += target_length
+                    if pred == real:
+                        tot_correct += 1
+                    else:
+                        wrong_cases.append((real, pred))
+
+                tot_count += images.size(0)
+
                 epoch_val_loss_list.append(val_loss)
-        avg_val_loss = torch.mean(torch.tensor(epoch_val_loss_list))
+        # avg_val_loss = torch.mean(torch.tensor(epoch_val_loss_list))
+        avg_val_loss = val_loss / tot_count
+        val_accuracy = tot_correct / tot_count
 
         # log losses and ... in a text file
         log_file_path = os.path.join(args.exp_dir, args.exp, f"training.log")
         with open(log_file_path, "a") as f:
-            loss_msg = f"Train loss: {avg_train_loss}, Test loss:{avg_val_loss}\n"
+            loss_msg = f"Train loss: {avg_train_loss}, Train acc:{train_accuracy}, Test loss:{avg_val_loss}, Val acc:{val_accuracy}\n"
             # TODO: compute accuracy
             print(loss_msg)
             f.write(loss_msg)

@@ -4,6 +4,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from bidi.algorithm import get_display
 from arabic_reshaper import reshape
+from typing import List
+
+from dataset import SadriDataset
+import torch
 
 
 def distortion_free_resize(img, img_size):
@@ -42,11 +46,13 @@ def distortion_free_resize(img, img_size):
 
     return img
 
+
 def preprocess_image(img, img_size):
     img = distortion_free_resize(img, img_size=img_size)
     img = img / 255.
 
     return img
+
 
 def visualize_samples(dataset, num_to_word, n_samples=8, cols=4, random_img=False):
     dataset = copy.deepcopy(dataset)
@@ -70,3 +76,30 @@ def visualize_samples(dataset, num_to_word, n_samples=8, cols=4, random_img=Fals
 
     plt.tight_layout(pad=1)
     plt.show()
+
+
+def greedy_decoder(emission: torch.Tensor, blank) -> List[str]:
+    """Given a sequence emission over labels, get the best path
+    Args:
+      emission (Tensor): Logit tensors. Shape `[num_seq, num_label]`.
+      blank: blank character
+    Returns:
+      List[str]: The resulting transcript
+    """
+    indices = torch.argmax(emission, dim=-1)  # [num_seq,]
+    indices = torch.unique_consecutive(indices, dim=-1)
+    indices = [i for i in indices if i != blank]
+    # joined = "".join([self.labels[i] for i in indices])
+    joined = "".join(SadriDataset.wv.num_to_word(indices))
+    return joined.replace("|", " ").strip().split()
+
+
+def ctc_decode(log_probs, blank=0):
+    emission_log_probs = np.transpose(log_probs.cpu().numpy(), (1, 0, 2))
+    # size of emission_log_probs: (batch, length, class)
+
+    decoded_list = []
+    for emission_log_prob in emission_log_probs:
+        decoded = greedy_decoder(torch.Tensor(emission_log_prob), blank=blank)
+        decoded_list.append(decoded)
+    return decoded_list
