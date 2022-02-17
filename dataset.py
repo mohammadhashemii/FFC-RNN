@@ -6,6 +6,7 @@ import torch.nn.functional as F
 
 from utils import preprocess_image
 
+
 class SadriDataset(Dataset):
     def __init__(self, root_dir='data', img_size=(256, 32), is_training_set=True):
         '''
@@ -30,7 +31,6 @@ class SadriDataset(Dataset):
         self.img_w, self.img_h = img_size
         self.num_samples = len(self.paths_and_labels['labels_list'])
 
-
     def __len__(self):
         return self.num_samples
 
@@ -41,7 +41,7 @@ class SadriDataset(Dataset):
         label = self.paths_and_labels['labels_list'][idx]
         sample = self._preprocess_image_and_label(img, label)
 
-        return sample   # image, label
+        return sample  # image, label
 
     def _read_filenames(self) -> list:
         with open(self.filenames_path) as f:
@@ -71,7 +71,7 @@ class SadriDataset(Dataset):
     def _create_words_vocab(self, labels: list):
         print("Creating word vocabulary...")
         word_vocab = set()
-        max_len = 0 # longest label size
+        max_len = 0  # longest label size
         for l in labels:
             l = l.split(' ')
             for word in l:
@@ -83,19 +83,19 @@ class SadriDataset(Dataset):
 
         return max_len, word_vocab
 
-
     def _preprocess_image_and_label(self, img, label):
         img = preprocess_image(img=img, img_size=(self.img_w, self.img_h))
         label = SadriDataset.wv.word_to_num(label=label)
 
         return {'image': img, 'label': label}
 
+
 class WordVocabulary:
     def __init__(self, word_vocab: set, max_len: int):
         self.word_vocab = word_vocab
         self.padding_token = 99
         self.max_len = max_len
-        self.le = LabelEncoder(list(self.word_vocab),)
+        self.le = LabelEncoder(list(self.word_vocab), )
 
     def word_to_num(self, label):
         label = label.split(' ')
@@ -109,5 +109,4 @@ class WordVocabulary:
 
     def num_to_word(self, indices):
         return self.le.batch_decode(indices)
-
-
+        # return self.le.decode(indices)

@@ -49,7 +49,7 @@ n_train = len(train_dataset)
 ffc_rnn = FFCRnn(image_height=args.imgH,
                  nc=1,  # since the images are black and white
                  nh=256,
-                 output_number=len(train_dataset.wv.word_vocab) + 3,
+                 output_number=len(train_dataset.wv.word_vocab) + 1,
                  n_rnn=4,
                  leaky_relu=False)
 
@@ -87,14 +87,17 @@ for epoch in range(args.n_epochs):
             images = batch['image'].to(device=device, dtype=torch.float32)  # (batch, c=1, imgH, imgW)
             labels = batch['label'].to(device=device, dtype=torch.int)
 
-            print(torch.count_nonzero(images))
-            print("--------------------")
+            # print(torch.count_nonzero(images))
+            # print("--------------------")
             preds = ffc_rnn(images)
             # print(preds)
             # print("--------------------")
             log_probs = F.log_softmax(preds, dim=2)
-            loss = compute_ctc_loss(log_probs, labels)
-            print(loss)
+            loss = compute_ctc_loss(log_probs, labels) / images.size()[0]
+
+            # if epoch == 10:
+            #   print(compute_ctc_loss(log_probs, labels, None))
+
             # decoded_preds = ctc_decode(log_probs, 0, SadriDataset)
             # target_lengths = torch.IntTensor([len(t) for t in labels])
 
@@ -107,21 +110,18 @@ for epoch in range(args.n_epochs):
             #     else:
             #         wrong_cases.append((real, pred))
 
-            tot_count += images.size(0)
             epoch_train_loss_list.append(loss)
 
             ffc_rnn.zero_grad()
             loss.backward()
             optimizer.step()
             pbar.update(images.shape[0])
-        # avg_train_loss = torch.mean(torch.tensor(epoch_train_loss_list))
-        avg_train_loss = loss / tot_correct
-        train_accuracy = tot_correct / tot_count
+        avg_train_loss = torch.mean(torch.tensor(epoch_train_loss_list))
+        # train_accuracy = tot_correct / tot_count
 
         # validation
         ffc_rnn.eval()
         tot_correct = 0
-        tot_count = 0
         wrong_cases = []
         for batch in test_loader:
             images = batch['image'].to(device=device, dtype=torch.float32)
@@ -130,34 +130,36 @@ for epoch in range(args.n_epochs):
                 preds = ffc_rnn(images)
 
                 log_probs = F.log_softmax(preds, dim=2)
-                val_loss = compute_ctc_loss(log_probs, labels).item()
+                val_loss = compute_ctc_loss(log_probs, labels).item() // images.size(0)
+                epoch_val_loss_list.append(val_loss)
 
-                decoded_preds = ctc_decode(log_probs, 0, SadriDataset)
-                target_lengths = torch.IntTensor([len(t) for t in labels])
-
+                decoded_preds, indices_list = ctc_decode(log_probs, 0, SadriDataset)
+                # target_lengths = torch.IntTensor([len(t) for t in labels])
+                target_lengths = torch.IntTensor([len(list(filter(lambda a: a != 0, t))) for t in labels])
                 target_length_counter = 0
-                for pred, target_length in zip(decoded_preds, target_lengths):
-                    real = labels[target_length_counter:target_length_counter + target_length]
-                    target_length_counter += target_length
-                    if pred == real:
+                for i in range(len(labels)):
+                    label_indices = labels[i]
+                    l = SadriDataset.wv.num_to_word(label_indices)
+                    words = [w for w in l if w != '<unk>']
+                    ground_truth_sentence = " ".join(words)
+                    # if epoch == 10:
+                    #   print(indices_list[i], label_indices)
+                    if avg_train_loss < 0:
+                        print(indices_list[i], label_indices)
+                    if ground_truth_sentence == decoded_preds[i]:
                         tot_correct += 1
                     else:
-                        wrong_cases.append((real, pred))
+                        wrong_cases.append((ground_truth_sentence, decoded_preds[i]))
 
-                tot_count += images.size(0)
-
-                epoch_val_loss_list.append(val_loss)
-        # avg_val_loss = torch.mean(torch.tensor(epoch_val_loss_list))
-        avg_val_loss = val_loss / tot_count
-        val_accuracy = tot_correct / tot_count
+        avg_val_loss = torch.mean(torch.tensor(epoch_val_loss_list))
+        val_accuracy = tot_correct / test_dataset.num_samples
 
         # log losses and ... in a text file
         log_file_path = os.path.join(args.exp_dir, args.exp, f"training.log")
         with open(log_file_path, "a") as f:
-            loss_msg = f"Train loss: {avg_train_loss}, Train acc:{train_accuracy}, Test loss:{avg_val_loss}, Val acc:{val_accuracy}\n"
-            # TODO: compute accuracy
-            print(loss_msg)
-            f.write(loss_msg)
+            msg = f"Train loss: {avg_train_loss}, Train acc:{None}, Test loss:{avg_val_loss}, Val acc:{val_accuracy}\n"
+            print(msg)
+            f.write(msg)
         f.close()
 
         # do checkpointing
