@@ -93,6 +93,9 @@ class FFCRnn(nn.Module):
 
         self.rnn1 = nn.LSTM(map_to_seq_hidden, nh, bidirectional=True)
         self.rnn2 = nn.LSTM(2 * nh, nh, bidirectional=True)
+        self.rnn3 = nn.LSTM(2 * nh, nh, bidirectional=True)
+        self.rnn4 = nn.LSTM(2 * nh, nh, bidirectional=True)
+        self.rnn5 = nn.LSTM(2 * nh, nh, bidirectional=True)
 
         self.fc = nn.Linear(nh * 2, output_number)
 
@@ -113,6 +116,9 @@ class FFCRnn(nn.Module):
         recurrent, _ = self.rnn1(seq)
         # print(recurrent.size())
         recurrent, _ = self.rnn2(recurrent)
+        recurrent, _ = self.rnn3(recurrent)
+        recurrent, _ = self.rnn4(recurrent)
+        recurrent, _ = self.rnn5(recurrent)
 
         # shape: (seq_len, batch, num_class)
         output = self.fc(recurrent)

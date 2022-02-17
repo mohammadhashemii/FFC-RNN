@@ -77,7 +77,7 @@ def visualize_samples(dataset, num_to_word, n_samples=8, cols=4, random_img=Fals
     plt.show()
 
 
-def greedy_decoder(emission: torch.Tensor, blank, ds) -> List[str]:
+def greedy_decoder(emission: torch.Tensor, blank, ds):
     """Given a sequence emission over labels, get the best path
     Args:
       emission (Tensor): Logit tensors. Shape `[num_seq, num_label]`.
@@ -90,16 +90,23 @@ def greedy_decoder(emission: torch.Tensor, blank, ds) -> List[str]:
     indices = torch.unique_consecutive(indices, dim=-1)
     indices = [int(i) for i in indices if i != blank]
     # joined = "".join([self.labels[i] for i in indices])
-    joined = "".join(ds.wv.num_to_word(torch.IntTensor(indices)))
-    return joined.replace("|", " ").strip().split()
+    words = [x for x in ds.wv.num_to_word(torch.IntTensor(indices)) if x != '<unk>']
+    joined = " ".join(words)
+
+    return joined, indices
 
 
-def ctc_decode(log_probs, blank, ds):
-    emission_log_probs = np.transpose(log_probs.cpu().numpy(), (1, 0, 2))
+def ctc_decode(log_probs, blank, ds, training=True):
+    if training:
+        emission_log_probs = np.transpose(log_probs.detach().cpu().numpy(), (1, 0, 2))
+    else:
+        emission_log_probs = np.transpose(log_probs.cpu().numpy(), (1, 0, 2))
     # size of emission_log_probs: (batch, length, class)
 
     decoded_list = []
+    indices_list = []
     for emission_log_prob in emission_log_probs:
-        decoded = greedy_decoder(torch.Tensor(emission_log_prob), blank, ds)
+        decoded, indices = greedy_decoder(torch.Tensor(emission_log_prob), blank, ds)
         decoded_list.append(decoded)
-    return decoded_list
+        indices_list.append(indices)
+    return decoded_list, indices_list
