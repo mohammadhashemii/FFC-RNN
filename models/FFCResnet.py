@@ -1,5 +1,5 @@
 import torch.nn as nn
-from FFC import *
+from models.FFC import *
 
 __all__ = ['FFCResNet', 'ffc_resnet18', 'ffc_resnet34',
            'ffc_resnet26', 'ffc_resnet50', 'ffc_resnet101',
@@ -178,30 +178,30 @@ class FFCResNet(nn.Module):
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        print("input size in ffcResnet", x.size())
+        # print("input size in ffcResnet", x.size())
 
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
         x = self.max_pool(x)
 
-        print(x.size())
+        # print(x.size())
 
         x = self.layer1(x)
         x = self.layer2(x)
         x = self.layer3(x)
         x = self.layer4(x)
 
-        print("after layers size in ffcResnet", x[0].size())
-        print(x[1])
-
-        x = self.avg_pool(x[0])
-        x = x.view(x.size(0), -1)
-
-        print("after layers 2 size in ffcResnet", x[0].size())
+        # print("after layers size in ffcResnet", x[0].size())
         # print(x[1])
 
-        x = self.fc(x)
+        # x = self.avg_pool(x[0])
+        # x = x.view(x.size(0), -1)
+
+        # print("after layers 2 size in ffcResnet", x[0].size())
+        # print(x[1])
+
+        # x = self.fc(x)
 
         return x
 
@@ -298,7 +298,8 @@ def ffc_resnext101_32x8d(pretrained=False, **kwargs):
 
 
 if __name__ == '__main__':
-    model = ffc_resnet18()
+    # model = ffc_resnet18()
+    model = ffc_resnet34()
     # model = ffc_resnet26()
     print("++++++++++++++++++++++++++")
     # tensor = torch.zeros([10, 1, 256, 256], dtype=torch.float32)
@@ -319,3 +320,6 @@ if __name__ == '__main__':
     # print("xs size after concat", xs.shape)
     # xs = torch.cat(torch.split(xs, (w // split_no), dim=-1), dim=1).contiguous()
     # print("xs final size", xs.size())
+
+    # cnn       [10, 80, 4, 32]
+    # ffcresnet [10, 512, 1, 8]
