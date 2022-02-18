@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from dataset import SadriDataset
 from tqdm import tqdm
 from models.FFCRnn import FFCRnn
+from models.FFCResnet import *
 from losses.CTC_loss import compute_ctc_loss
 from torchsummary import summary
 from utils import ctc_decode
@@ -52,7 +53,9 @@ ffc_rnn = FFCRnn(image_height=args.imgH,
                  nh=256,
                  output_number=len(train_dataset.wv.word_vocab) + 1,
                  n_rnn=4,
-                 leaky_relu=False)
+                 leaky_relu=False,
+                 map_to_seq_hidden=512,
+                 feature_extractor=ffc_resnet18())
 
 ffc_rnn.to(device=device)
 if args.resume is not None:
@@ -160,7 +163,7 @@ for epoch in range(args.n_epochs):
         if not os.path.exists(os.path.join(args.exp_dir, args.exp, 'checkpoints')):
             os.makedirs(os.path.join(args.exp_dir, args.exp, 'checkpoints'))
         if least_loss is None or avg_val_loss < least_loss:
-            checkpoint_path = os.path.join(args.exp_dir, args.exp, 'checkpoints', f"checkpoint_epoch_{epoch}")
+            checkpoint_path = os.path.join(args.exp_dir, args.exp, 'checkpoints', f"checkpoint_best")
             torch.save(ffc_rnn.state_dict(), checkpoint_path)
             least_loss = avg_val_loss
 

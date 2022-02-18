@@ -1,5 +1,5 @@
 import torch.nn as nn
-# from FFC import *
+# from FFCResnet import *
 import torch.nn.functional as F
 import numpy as np
 import torch
@@ -30,7 +30,8 @@ class BidirectionalLSTM(nn.Module):
 
 class FFCRnn(nn.Module):
 
-    def __init__(self, image_height, nc, output_number, nh, n_rnn=2, leaky_relu=False, map_to_seq_hidden=64):
+    def __init__(self, image_height, nc, output_number, nh, n_rnn=2, leaky_relu=False, map_to_seq_hidden=64,
+                 feature_extractor=None):
         super(FFCRnn, self).__init__()
 
         assert image_height % 16 == 0, 'imgH has to be a multiple of 16'
@@ -78,7 +79,10 @@ class FFCRnn(nn.Module):
         # cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((2, 2), (2, 1), (0, 1)))  # 512 x 2 x 16
         # conv_relu(6, True)  # 512 x 1 x 16
 
-        self.cnn = cnn
+        if feature_extractor is None:
+            self.cnn = cnn
+        else:
+            self.cnn = feature_extractor
         #
         # self.adp = nn.AdaptiveAvgPool2d((512, None))
         #
@@ -86,23 +90,28 @@ class FFCRnn(nn.Module):
         #     BidirectionalLSTM(512, nh, nh),
         #     BidirectionalLSTM(nh, nh, output_number, return_seq=False))
 
-        output_channel = 80
-        output_height = 4
+        # output_channel = 80
+        # output_height = 4
+
+        output_channel = 512
+        output_height = 1
 
         self.map_to_seq = nn.Linear(output_channel * output_height, map_to_seq_hidden)
 
-        self.rnn1 = nn.LSTM(map_to_seq_hidden, nh, bidirectional=True)
-        self.rnn2 = nn.LSTM(2 * nh, nh, bidirectional=True)
-        self.rnn3 = nn.LSTM(2 * nh, nh, bidirectional=True)
-        self.rnn4 = nn.LSTM(2 * nh, nh, bidirectional=True)
-        self.rnn5 = nn.LSTM(2 * nh, nh, bidirectional=True)
+        self.rnn1 = nn.LSTM(map_to_seq_hidden, nh, bidirectional=True, dropout=0.5)
+        self.rnn2 = nn.LSTM(2 * nh, nh, bidirectional=True, dropout=0.5)
+        self.rnn3 = nn.LSTM(2 * nh, nh, bidirectional=True, dropout=0.5)
+        self.rnn4 = nn.LSTM(2 * nh, nh, bidirectional=True, dropout=0.5)
+        self.rnn5 = nn.LSTM(2 * nh, nh, bidirectional=True, dropout=0.5)
 
         self.fc = nn.Linear(nh * 2, output_number)
 
     def forward(self, x):
         # conv features
-        conv = self.cnn(x)
+        conv, _ = self.cnn(x)
         b, c, h, w = conv.size()
+
+        # print(conv.size())
         conv = conv.view(b, c * h, w)
         # conv = self.adp(conv)
         conv = conv.permute(2, 0, 1)  # (width, batch, feature)
@@ -117,8 +126,8 @@ class FFCRnn(nn.Module):
         # print(recurrent.size())
         recurrent, _ = self.rnn2(recurrent)
         recurrent, _ = self.rnn3(recurrent)
-        recurrent, _ = self.rnn4(recurrent)
-        recurrent, _ = self.rnn5(recurrent)
+        # recurrent, _ = self.rnn4(recurrent)
+        # recurrent, _ = self.rnn5(recurrent)
 
         # shape: (seq_len, batch, num_class)
         output = self.fc(recurrent)
@@ -130,8 +139,8 @@ class FFCRnn(nn.Module):
 
 
 if __name__ == '__main__':
-    # ffc_rnn = FFCRnn(32, 32, 32, 32)
-    ffc_rnn = FFCRnn(32, 1, 41, 256)
+    ffc_rnn = FFCRnn(32, 32, 32, 32)
+    # ffc_rnn = FFCRnn(32, 1, 41, 256, map_to_seq_hidden=512, feature_extractor=ffc_resnet18())
     tensor = torch.zeros([10, 1, 32, 256], dtype=torch.float32)
     res = ffc_rnn(tensor)
     # ffc_rnn = FFCRnn(32, 1, 64, 64)
