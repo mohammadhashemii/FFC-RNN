@@ -48,14 +48,19 @@ test_loader = DataLoader(test_dataset, shuffle=False, **loader_args)
 n_train = len(train_dataset)
 
 # create the model
-ffc_rnn = FFCRnn(image_height=args.imgH,
-                 nc=1,  # since the images are black and white
-                 nh=256,
+# ffc_rnn = FFCRnn(image_height=args.imgH,
+#                  nc=1,  # since the images are black and white
+#                  nh=256,
+#                  output_number=len(train_dataset.wv.word_vocab) + 1,
+#                  n_rnn=4,
+#                  leaky_relu=False,
+#                  map_to_seq_hidden=512,
+#                  feature_extractor=ffc_resnet18())
+
+ffc_rnn = FFCRnn(nh=256,
                  output_number=len(train_dataset.wv.word_vocab) + 1,
                  n_rnn=4,
-                 leaky_relu=False,
-                 map_to_seq_hidden=512,
-                 feature_extractor=ffc_resnet18())
+                 feature_extractor="ffc_resnet18")
 
 ffc_rnn.to(device=device)
 if args.resume is not None:
@@ -75,9 +80,9 @@ with open(json_path, "w") as jf:
     json.dump(training_configs, jf)
 print(f"Training configs:\n {training_configs}")
 
-#model_summary = summary(ffc_rnn, (1, args.imgH, args.imgW), batch_size=-1, device='cuda')
-#model_summary_path = os.path.join(args.exp_dir, args.exp, f"model_summary.txt")
-#with open(model_summary, "w") as f:
+# model_summary = summary(ffc_rnn, (1, args.imgH, args.imgW), batch_size=-1, device='cuda')
+# model_summary_path = os.path.join(args.exp_dir, args.exp, f"model_summary.txt")
+# with open(model_summary, "w") as f:
 #    f.write(model_summary)
 #    f.close()
 
@@ -99,8 +104,14 @@ for epoch in range(args.n_epochs):
             log_probs = F.log_softmax(preds, dim=2)
             loss = compute_ctc_loss(log_probs, labels) / images.size()[0]
             epoch_train_loss_list.append(loss)
+
+            ffc_rnn.zero_grad()
+            loss.backward()
+            optimizer.step()
+            pbar.update(images.shape[0])
+
             '''
-            decoded_preds, indices_list = ctc_decode(log_probs, 0, SadriDataset, training=True)
+            decoded_preds, indices_list = ctc_decode(log_probs.detach().clone(), 0, SadriDataset, training=True)
             target_lengths = torch.IntTensor([len(list(filter(lambda a: a != 0, t))) for t in labels])
             target_length_counter = 0
             for i in range(len(labels)):
@@ -113,10 +124,7 @@ for epoch in range(args.n_epochs):
                 else:
                     wrong_cases.append((ground_truth_sentence, decoded_preds[i]))
             '''
-            ffc_rnn.zero_grad()
-            loss.backward()
-            optimizer.step()
-            pbar.update(images.shape[0])
+
         avg_train_loss = torch.mean(torch.tensor(epoch_train_loss_list))
         train_accuracy = tot_correct / train_dataset.num_samples
 
@@ -166,6 +174,3 @@ for epoch in range(args.n_epochs):
             checkpoint_path = os.path.join(args.exp_dir, args.exp, 'checkpoints', f"checkpoint_best")
             torch.save(ffc_rnn.state_dict(), checkpoint_path)
             least_loss = avg_val_loss
-
-
-
