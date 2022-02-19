@@ -5,6 +5,7 @@ import numpy as np
 from bidi.algorithm import get_display
 from arabic_reshaper import reshape
 from typing import List
+import json
 
 import torch
 
@@ -77,7 +78,7 @@ def visualize_samples(dataset, num_to_word, n_samples=8, cols=4, random_img=Fals
     plt.show()
 
 
-def greedy_decoder(emission: torch.Tensor, blank, ds):
+def greedy_decoder(emission: torch.Tensor, blank, ds, dict_path=None, training=True):
     """Given a sequence emission over labels, get the best path
     Args:
       emission (Tensor): Logit tensors. Shape `[num_seq, num_label]`.
@@ -90,6 +91,10 @@ def greedy_decoder(emission: torch.Tensor, blank, ds):
     indices = torch.unique_consecutive(indices, dim=-1)
     indices = [int(i) for i in indices if i != blank]
     # joined = "".join([self.labels[i] for i in indices])
+    if not training:    # convert the vocab dictionary to the one which have used for training
+        with open(dict_path, encoding='utf8') as json_file:
+            d = json.load(json_file)
+        indices = [ds.wv.le.encode(d[idx]) for idx in indices]
     words = [x for x in ds.wv.num_to_word(torch.IntTensor(indices)) if x != '<unk>']
     joined = " ".join(words)
 
@@ -106,7 +111,23 @@ def ctc_decode(log_probs, blank, ds, training=True):
     decoded_list = []
     indices_list = []
     for emission_log_prob in emission_log_probs:
-        decoded, indices = greedy_decoder(torch.Tensor(emission_log_prob), blank, ds)
+        decoded, indices = greedy_decoder(torch.Tensor(emission_log_prob), blank, ds, training=training)
         decoded_list.append(decoded)
         indices_list.append(indices)
     return decoded_list, indices_list
+
+
+def save_vocab_dict(dataset, json_path):
+    '''
+    save the vocab dictionary as json file
+    '''
+    d = {}
+    for i in range(1, len(dataset.wv.le.vocab)):
+        word = dataset.wv.le.vocab[i]
+        d[dataset.wv.le.encode(word).item()] = word
+
+    with open(json_path, "w", encoding='utf8') as jf:
+        json.dump(d, jf, ensure_ascii=False)
+
+    print(f"Vocab dictionary saved at {json_path}")
+
