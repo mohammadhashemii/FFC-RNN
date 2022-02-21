@@ -3,7 +3,7 @@ import torchvision
 from torch.utils.data import Dataset
 from torchnlp.encoders import LabelEncoder
 import torch.nn.functional as F
-
+import torch
 from utils import preprocess_image
 
 
@@ -95,11 +95,19 @@ class WordVocabulary:
         self.word_vocab = word_vocab
         self.padding_token = 99
         self.max_len = max_len
-        self.le = LabelEncoder(list(self.word_vocab), )
+        self.words_dict = {'نود': 1, 'شانزده': 2, 'یازده': 3, 'نهصد': 4, 'پنج': 5, 'شصت': 6, 'هجده': 7, 'هفده': 8,
+                           'هزار': 9, 'هفتصد': 10, 'ده': 11, 'ریال': 12, 'نه': 13, 'صد': 14, 'ششصد': 15, 'هشتصد': 16,
+                           'یک': 17, 'چهار': 18, 'چهل': 19, 'پانزده': 20, 'بیست': 21, 'دویست': 22, 'چهارده': 23,
+                           'سه': 24, 'پنجاه': 25, 'میلیارد': 26, 'دوازده': 27, 'هفت': 28, 'شش': 29, 'و': 30,
+                           'میلیون': 31, 'سیصد': 32, 'چهارصد': 33, 'سی': 34, 'پانصد': 35, 'نوزده': 36, 'هشت': 37,
+                           'سیزده': 38, 'هشتاد': 39, 'دو': 40, 'هفتاد': 41}
 
+        self.le = LabelEncoder(list(self.word_vocab), )
+        self.blank = 0
     def word_to_num(self, label):
         label = label.split(' ')
-        enl = self.le.batch_encode(label)
+        # enl = self.le.batch_encode(label)
+        enl = self.encode(label)
         length = enl.shape[0]
         pad_amount = self.max_len - length
         padding_token = 0
@@ -108,5 +116,17 @@ class WordVocabulary:
         return label
 
     def num_to_word(self, indices):
-        return self.le.batch_decode(indices)
-        # return self.le.decode(indices)
+        # return self.le.batch_decode(indices)
+        return self.decode(indices)
+
+    def encode(self, label):
+        return torch.IntTensor([self.words_dict[w] for w in label])
+
+    def decode(self, indices):
+        indices_dict = {v: k for k, v in self.words_dict.items()}
+        temp = indices.tolist()
+        temp = [i for i in temp if i != self.blank]
+        words = [indices_dict[idx] for idx in temp]
+        # print(words)
+        return words
+
