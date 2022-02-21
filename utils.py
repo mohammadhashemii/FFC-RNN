@@ -78,7 +78,7 @@ def visualize_samples(dataset, num_to_word, n_samples=8, cols=4, random_img=Fals
     plt.show()
 
 
-def greedy_decoder(emission: torch.Tensor, blank, ds, dict_path=None, training=True):
+def greedy_decoder(emission: torch.Tensor, blank, ds):
     """Given a sequence emission over labels, get the best path
     Args:
       emission (Tensor): Logit tensors. Shape `[num_seq, num_label]`.
@@ -89,29 +89,22 @@ def greedy_decoder(emission: torch.Tensor, blank, ds, dict_path=None, training=T
     """
     indices = torch.argmax(emission, dim=-1)  # [num_seq,]
     indices = torch.unique_consecutive(indices, dim=-1)
-    indices = [int(i) for i in indices if i != blank]
+    indices = [i for i in indices if i != blank]
     # joined = "".join([self.labels[i] for i in indices])
-    if not training:    # convert the vocab dictionary to the one which have used for training
-        with open(dict_path, encoding='utf8') as json_file:
-            d = json.load(json_file)
-        indices = [ds.wv.le.encode(d[idx]) for idx in indices]
     words = [x for x in ds.wv.num_to_word(torch.IntTensor(indices)) if x != '<unk>']
     joined = " ".join(words)
 
     return joined, indices
 
 
-def ctc_decode(log_probs, blank, ds, training=True):
-    if training:
-        emission_log_probs = np.transpose(log_probs.detach().cpu().numpy(), (1, 0, 2))
-    else:
-        emission_log_probs = np.transpose(log_probs.cpu().numpy(), (1, 0, 2))
+def ctc_decode(log_probs, blank, ds):
+    emission_log_probs = np.transpose(log_probs.cpu().numpy(), (1, 0, 2))
     # size of emission_log_probs: (batch, length, class)
 
     decoded_list = []
     indices_list = []
     for emission_log_prob in emission_log_probs:
-        decoded, indices = greedy_decoder(torch.Tensor(emission_log_prob), blank, ds, training=training)
+        decoded, indices = greedy_decoder(torch.Tensor(emission_log_prob), blank, ds)
         decoded_list.append(decoded)
         indices_list.append(indices)
     return decoded_list, indices_list
@@ -130,4 +123,3 @@ def save_vocab_dict(dataset, json_path):
         json.dump(d, jf, ensure_ascii=False)
 
     print(f"Vocab dictionary saved at {json_path}")
-

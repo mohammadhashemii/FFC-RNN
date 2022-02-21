@@ -47,14 +47,10 @@ loader_args = dict(batch_size=args.batch_size,
 test_loader = DataLoader(test_dataset, shuffle=False, **loader_args)
 
 # load the model
-ffc_rnn = FFCRnn(image_height=args.imgH,
-                 nc=1,  # since the images are black and white
-                 nh=256,
+ffc_rnn = FFCRnn(nh=256,
                  output_number=len(train_dataset.wv.word_vocab) + 1,
                  n_rnn=4,
-                 leaky_relu=False,
-                 map_to_seq_hidden=512,
-                 feature_extractor=ffc_resnet18())
+                 feature_extractor="ffc_resnet18")
 
 ffc_rnn.to(device=device)
 # load the weights
@@ -80,12 +76,13 @@ for batch in test_loader:
         val_loss = compute_ctc_loss(log_probs, labels).item() // images.size(0)
         val_loss_list.append(val_loss)
 
-        decoded_preds, indices_list = ctc_decode(log_probs, 0, SadriDataset, training=False)
+        decoded_preds, indices_list = ctc_decode(log_probs, 0, SadriDataset)
 
         target_lengths = torch.IntTensor([len(list(filter(lambda a: a != 0, t))) for t in labels])
         target_length_counter = 0
         for i in range(len(labels)):
             label_indices = labels[i]
+            # label_indices = [i for i in label_indices if i != 0]
             l = SadriDataset.wv.num_to_word(label_indices)
             words = [w for w in l if w != '<unk>']
             ground_truth_sentence = " ".join(words)

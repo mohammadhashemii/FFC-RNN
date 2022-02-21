@@ -41,7 +41,6 @@ train_dataset = SadriDataset(root_dir=args.data_root, img_size=img_size, is_trai
 test_dataset = SadriDataset(root_dir=args.data_root, img_size=img_size, is_training_set=False)
 save_vocab_dict(SadriDataset, json_path=os.path.join(args.exp_dir, args.exp, "vocab_dict.json"))
 
-
 loader_args = dict(batch_size=args.batch_size,
                    num_workers=args.num_workers,
                    pin_memory=True)
@@ -112,8 +111,7 @@ for epoch in range(args.n_epochs):
             optimizer.step()
             pbar.update(images.shape[0])
 
-            '''
-            decoded_preds, indices_list = ctc_decode(log_probs.detach().clone(), 0, SadriDataset, training=True)
+            decoded_preds, indices_list = ctc_decode(log_probs.detach().clone(), 0, SadriDataset)
             target_lengths = torch.IntTensor([len(list(filter(lambda a: a != 0, t))) for t in labels])
             target_length_counter = 0
             for i in range(len(labels)):
@@ -125,7 +123,6 @@ for epoch in range(args.n_epochs):
                     tot_correct += 1
                 else:
                     wrong_cases.append((ground_truth_sentence, decoded_preds[i]))
-            '''
 
         avg_train_loss = torch.mean(torch.tensor(epoch_train_loss_list))
         train_accuracy = tot_correct / train_dataset.num_samples
@@ -144,7 +141,7 @@ for epoch in range(args.n_epochs):
                 val_loss = compute_ctc_loss(log_probs, labels).item() // images.size(0)
                 epoch_val_loss_list.append(val_loss)
 
-                decoded_preds, indices_list = ctc_decode(log_probs, 0, SadriDataset, training=False)
+                decoded_preds, indices_list = ctc_decode(log_probs, 0, SadriDataset)
                 # target_lengths = torch.IntTensor([len(t) for t in labels])
                 target_lengths = torch.IntTensor([len(list(filter(lambda a: a != 0, t))) for t in labels])
                 target_length_counter = 0
