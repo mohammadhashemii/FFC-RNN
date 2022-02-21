@@ -10,11 +10,11 @@ class CNN(nn.Module):
 
         assert image_height % 16 == 0, 'imgH has to be a multiple of 16'
 
-        kernel_sizes = [3, 3, 3, 3, 3, 3, 2]
-        padding_sizes = [1, 1, 1, 1, 1, 1, 0]
-        stride_sizes = [1, 1, 1, 1, 1, 1, 1]
+        kernel_sizes = [3, 3, 3, 3, 3, 3]
+        padding_sizes = [1, 1, 1, 1, 1, 1]
+        stride_sizes = [1, 1, 1, 1, 1, 1]
         # nm = [64, 128, 256, 256, 512, 512, 512]
-        nm = [32, 32, 48, 64, 80, 512, 512]
+        nm = [16, 32, 48, 64, 80, 128]
 
         cnn = nn.Sequential()
 
@@ -38,10 +38,12 @@ class CNN(nn.Module):
         conv_relu(1)
         cnn.add_module('pooling{0}'.format(1), nn.MaxPool2d(2, 2))  # (128, img_height // 4, img_width // 4)
         conv_relu(2)
-        cnn.add_module('pooling{0}'.format(2), nn.MaxPool2d((2, 1)))  # (256, img_height // 8, img_width // 4)
+        cnn.add_module('pooling{0}'.format(2), nn.MaxPool2d((2, 2)))  # (256, img_height // 8, img_width // 4)
         conv_relu(3)
         cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((1, 2)))  # 256 x 4 x 16
         conv_relu(4)
+        cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((2, 1)))
+        conv_relu(5)
 
         # cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((1, 2)))
         # conv_relu(5)
@@ -68,7 +70,7 @@ class BiLSTM(nn.Module):
         return recurrent
 
 
-FEATURE_EXTRACTORS = {'cnn': {'model': CNN(image_height=32, nc=1), "output_channel": 80, "output_height": 4},
+FEATURE_EXTRACTORS = {'cnn': {'model': CNN(image_height=32, nc=1), "output_channel": 128, "output_height": 2},
                       'ffc_resnet18': {'model': ffc_resnet18(), "output_channel": 512, "output_height": 1},
                       'ffc_resnet34': {'model': ffc_resnet34(), "output_channel": 512, "output_height": 1},
                       'ffc_resnet26': {'model': ffc_resnet26(), "output_channel": 2048, "output_height": 1},
@@ -85,7 +87,7 @@ class FFCRnn(nn.Module):
         output_height = FEATURE_EXTRACTORS[feature_extractor]["output_height"]
 
         if map_to_seq_hidden is None:
-            map_to_seq_hidden = output_channel
+            map_to_seq_hidden = output_channel * output_height
 
         self.attn = SelfAttention(output_channel, None)
 
@@ -97,12 +99,6 @@ class FFCRnn(nn.Module):
         for i in range(1, n_rnn):
             self.rnn.add_module('rnn{0}'.format(i + 1), BiLSTM(2 * nh, nh))
 
-        # self.drp = nn.Dropout(0.5)
-        # self.rnn1 = nn.LSTM(map_to_seq_hidden, nh, bidirectional=True)
-        # self.rnn2 = nn.LSTM(2 * nh, nh, bidirectional=True)
-        # self.rnn3 = nn.LSTM(2 * nh, nh, bidirectional=True)
-        # self.rnn4 = nn.LSTM(2 * nh, nh, bidirectional=True)
-        # self.rnn5 = nn.LSTM(2 * nh, nh, bidirectional=True)
 
         self.fc = nn.Linear(nh * 2, output_number)
 
@@ -111,18 +107,20 @@ class FFCRnn(nn.Module):
         conv, _ = self.cnn(x)
 
         b, c, h, w = conv.size()
-        print(conv.size())
+        #print(conv.size())
 
         conv = self.attn(conv)
+        #print(conv.size())
 
         # print(conv.size())
         conv = conv.view(b, c * h, w)
         conv = conv.permute(2, 0, 1)  # (width, batch, feature)
 
         seq = self.map_to_seq(conv)
-        # print(seq.size())
+        #print(seq.size())
 
         recurrent = self.rnn(seq)
+        #print(recurrent.size())
 
         output = self.fc(recurrent)  # (seq_len, batch, num_class)
 
@@ -131,9 +129,10 @@ class FFCRnn(nn.Module):
 
 if __name__ == '__main__':
     # ffc_rnn = FFCRnn(32, 32, 32, 32)
-    ffc_rnn = FFCRnn(output_number=41, nh=256, n_rnn=3, feature_extractor="ffc_resnet18")
+    model = FFCRnn(output_number=41, nh=256, n_rnn=5, feature_extractor="cnn")
+    #cnn = CNN(image_height=32, nc=1)
     tensor = torch.zeros([10, 1, 32, 256], dtype=torch.float32)
-    res = ffc_rnn(tensor)
+    res = model(tensor)
     # ffc_rnn = FFCRnn(32, 1, 64, 64)
     # tensor = torch.zeros([10, 1, 32, 256], dtype=torch.float32)
     # res = ffc_rnn(tensor)
