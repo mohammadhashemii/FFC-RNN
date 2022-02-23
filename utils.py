@@ -6,6 +6,7 @@ from bidi.algorithm import get_display
 from arabic_reshaper import reshape
 from typing import List
 import json
+from scipy.special import logsumexp
 
 import torch
 
@@ -78,6 +79,67 @@ def visualize_samples(dataset, num_to_word, n_samples=8, cols=4, random_img=Fals
     plt.show()
 
 
+def _reconstruct(labels, blank=0):
+    new_labels = []
+    # merge same labels
+    previous = None
+    for label in labels:
+        if label != previous:
+            new_labels.append(label)
+            previous = label
+    # delete blank
+    new_labels = [new_label for new_label in new_labels if new_label != blank]
+
+    return new_labels
+
+
+def beam_search_decode(emission_log_prob, blank, ds, **kwargs):
+    NINF = -1 * float('inf')
+    DEFAULT_EMISSION_THRESHOLD = 0.01
+
+    # beam_size = kwargs['beam_size']
+    # emission_threshold = kwargs.get('emission_threshold', np.log(DEFAULT_EMISSION_THRESHOLD))
+
+    beam_size = 10
+    emission_threshold = np.log(DEFAULT_EMISSION_THRESHOLD)
+
+    length, class_count = emission_log_prob.shape
+
+    beams = [([], 0)]  # (prefix, accumulated_log_prob)
+    for t in range(length):
+        new_beams = []
+        for prefix, accumulated_log_prob in beams:
+            for c in range(class_count):
+                log_prob = emission_log_prob[t, c]
+                if log_prob < emission_threshold:
+                    continue
+                new_prefix = prefix + [c]
+                # log(p1 * p2) = log_p1 + log_p2
+                new_accu_log_prob = accumulated_log_prob + log_prob
+                new_beams.append((new_prefix, new_accu_log_prob))
+
+        # sorted by accumulated_log_prob
+        new_beams.sort(key=lambda x: x[1], reverse=True)
+        beams = new_beams[:beam_size]
+
+    # sum up beams to produce labels
+    total_accu_log_prob = {}
+    for prefix, accu_log_prob in beams:
+        labels = tuple(_reconstruct(prefix, blank))
+        # log(p1 + p2) = logsumexp([log_p1, log_p2])
+        total_accu_log_prob[labels] = logsumexp([accu_log_prob, total_accu_log_prob.get(labels, NINF)])
+
+    labels_beams = [(list(labels), accu_log_prob)
+                    for labels, accu_log_prob in total_accu_log_prob.items()]
+    labels_beams.sort(key=lambda x: x[1], reverse=True)
+    labels = labels_beams[0][0]
+
+    words = [x for x in ds.wv.num_to_word(torch.IntTensor(labels)) if x != '<unk>']
+    joined = " ".join(words)
+    
+    return joined, labels
+
+
 def greedy_decoder(emission: torch.Tensor, blank, ds):
     """Given a sequence emission over labels, get the best path
     Args:
@@ -97,14 +159,17 @@ def greedy_decoder(emission: torch.Tensor, blank, ds):
     return joined, indices
 
 
-def ctc_decode(log_probs, blank, ds):
+def ctc_decode(log_probs, blank, ds, beam_decode=False):
     emission_log_probs = np.transpose(log_probs.cpu().numpy(), (1, 0, 2))
     # size of emission_log_probs: (batch, length, class)
 
     decoded_list = []
     indices_list = []
     for emission_log_prob in emission_log_probs:
-        decoded, indices = greedy_decoder(torch.Tensor(emission_log_prob), blank, ds)
+        if beam_decode:
+            decoded, indices = beam_search_decode(torch.Tensor(emission_log_prob), blank, ds)
+        else:
+            decoded, indices = greedy_decoder(torch.Tensor(emission_log_prob), blank, ds)
         decoded_list.append(decoded)
         indices_list.append(indices)
     return decoded_list, indices_list
