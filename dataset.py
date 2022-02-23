@@ -1,7 +1,6 @@
 import os
 import torchvision
 from torch.utils.data import Dataset
-from torchnlp.encoders import LabelEncoder
 import torch.nn.functional as F
 import torch
 from utils import preprocess_image
@@ -102,8 +101,8 @@ class WordVocabulary:
                            'میلیون': 31, 'سیصد': 32, 'چهارصد': 33, 'سی': 34, 'پانصد': 35, 'نوزده': 36, 'هشت': 37,
                            'سیزده': 38, 'هشتاد': 39, 'دو': 40, 'هفتاد': 41}
 
-        self.le = LabelEncoder(list(self.word_vocab), )
         self.blank = 0
+
     def word_to_num(self, label):
         label = label.split(' ')
         # enl = self.le.batch_encode(label)
@@ -129,4 +128,3 @@ class WordVocabulary:
         words = [indices_dict[idx] for idx in temp]
         # print(words)
         return words
-

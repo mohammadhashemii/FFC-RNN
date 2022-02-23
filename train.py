@@ -39,7 +39,6 @@ if not os.path.exists(os.path.join(args.exp_dir, args.exp)):
 img_size = (args.imgW, args.imgH)
 train_dataset = SadriDataset(root_dir=args.data_root, img_size=img_size, is_training_set=True)
 test_dataset = SadriDataset(root_dir=args.data_root, img_size=img_size, is_training_set=False)
-save_vocab_dict(SadriDataset, json_path=os.path.join(args.exp_dir, args.exp, "vocab_dict.json"))
 
 loader_args = dict(batch_size=args.batch_size,
                    num_workers=args.num_workers,
@@ -60,7 +59,7 @@ n_train = len(train_dataset)
 
 ffc_rnn = FFCRnn(nh=256,
                  output_number=len(train_dataset.wv.word_vocab) + 1,
-                 n_rnn=4,
+                 n_rnn=2,
                  feature_extractor="ffc_resnet18")
 
 ffc_rnn.to(device=device)
@@ -108,6 +107,7 @@ for epoch in range(args.n_epochs):
 
             ffc_rnn.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm_(ffc_rnn.parameters(), 5)
             optimizer.step()
             pbar.update(images.shape[0])
 

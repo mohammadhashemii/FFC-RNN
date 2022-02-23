@@ -1,6 +1,75 @@
 import torch.nn as nn
-from FFCResnet import *
-from SelfAttention import *
+from models.FFCResnet import *
+from models.SelfAttention import *
+from models.FFC import FfcBnAct
+
+
+class SimpleFFC(nn.Module):
+
+    def __init__(self, image_height=32, nc=1, ratio_gin=0.5, ratio_gout=0.5, lfu=False):
+        super(SimpleFFC, self).__init__()
+
+        assert image_height % 16 == 0, 'imgH has to be a multiple of 16'
+
+        kernel_sizes = [3, 3, 3, 3, 3, 3]
+        padding_sizes = [1, 1, 1, 1, 1, 1]
+        stride_sizes = [1, 1, 1, 1, 1, 1]
+        # nm = [64, 128, 256, 256, 512, 512, 512]
+        nm = [16, 32, 48, 64, 80, 128]
+        self.ratio_gin = ratio_gin
+        self.ratio_gout = ratio_gout
+        self.lfu = lfu
+
+        ffc = nn.Sequential()
+
+        def conv_relu(i, batch_normalization=False):
+            input_channels = nc if i == 0 else nm[i - 1]
+            output_channels = nm[i]
+            ffc.add_module('conv{0}'.format(i),
+                           nn.Conv2d(input_channels, output_channels, (kernel_sizes[i], kernel_sizes[i]),
+                                     (stride_sizes[i], stride_sizes[i]), padding_sizes[i]))
+
+            if batch_normalization:
+                ffc.add_module('batchnorm{0}'.format(i), nn.BatchNorm2d(output_channels))
+            ffc.add_module('relu{0}'.format(i), nn.ReLU(True))
+
+        def ffc_relu(i):
+            input_channels = nc if i == 0 else nm[i - 1]
+            output_channels = nm[i]
+
+            ffc.add_module('ffc{0}'.format(i),
+                           FfcBnAct(input_channels, output_channels,
+                                    kernel_size=(kernel_sizes[i], kernel_sizes[i]),
+                                    padding=padding_sizes[i],
+                                    stride=stride_sizes[i],
+                                    ratio_gin=self.ratio_gin, ratio_gout=self.ratio_gout,
+                                    activation_layer=nn.ReLU,
+                                    enable_lfu=self.lfu,
+                                    merge=True)
+                           )
+
+        conv_relu(0)
+        ffc.add_module('pooling{0}'.format(0), nn.MaxPool2d(2, 2))  # (64, img_height // 2, img_width // 2)
+        ffc_relu(1)
+        ffc.add_module('pooling{0}'.format(1), nn.MaxPool2d(2, 2))  # (128, img_height // 4, img_width // 4)
+        ffc_relu(2)
+        ffc.add_module('pooling{0}'.format(2), nn.MaxPool2d((2, 2)))  # (256, img_height // 8, img_width // 4)
+        ffc_relu(3)
+        ffc.add_module('pooling{0}'.format(3), nn.MaxPool2d((1, 2)))  # 256 x 4 x 16
+        ffc_relu(4)
+        ffc.add_module('pooling{0}'.format(3), nn.MaxPool2d((2, 1)))
+        ffc_relu(5)
+
+        # cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((1, 2)))
+        # conv_relu(5)
+        # cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((2, 2), (2, 1), (0, 1)))  # 512 x 2 x 16
+        # conv_relu(6, True)  # 512 x 1 x 16
+
+        self.ffc = ffc
+
+    def forward(self, x):
+        conv = self.ffc(x)
+        return conv, 0
 
 
 class CNN(nn.Module):
@@ -71,6 +140,8 @@ class BiLSTM(nn.Module):
 
 
 FEATURE_EXTRACTORS = {'cnn': {'model': CNN(image_height=32, nc=1), "output_channel": 128, "output_height": 2},
+                      'ffc': {'model': SimpleFFC(image_height=32, nc=1, lfu=True), "output_channel": 128,
+                              "output_height": 2},
                       'ffc_resnet18': {'model': ffc_resnet18(), "output_channel": 512, "output_height": 1},
                       'ffc_resnet34': {'model': ffc_resnet34(), "output_channel": 512, "output_height": 1},
                       'ffc_resnet26': {'model': ffc_resnet26(), "output_channel": 2048, "output_height": 1},
@@ -99,7 +170,6 @@ class FFCRnn(nn.Module):
         for i in range(1, n_rnn):
             self.rnn.add_module('rnn{0}'.format(i + 1), BiLSTM(2 * nh, nh))
 
-
         self.fc = nn.Linear(nh * 2, output_number)
 
     def forward(self, x):
@@ -107,20 +177,20 @@ class FFCRnn(nn.Module):
         conv, _ = self.cnn(x)
 
         b, c, h, w = conv.size()
-        #print(conv.size())
+        # print(conv.size())
 
         conv = self.attn(conv)
-        #print(conv.size())
+        # print(conv.size())
 
         # print(conv.size())
         conv = conv.view(b, c * h, w)
         conv = conv.permute(2, 0, 1)  # (width, batch, feature)
 
         seq = self.map_to_seq(conv)
-        #print(seq.size())
+        # print(seq.size())
 
         recurrent = self.rnn(seq)
-        #print(recurrent.size())
+        # print(recurrent.size())
 
         output = self.fc(recurrent)  # (seq_len, batch, num_class)
 
@@ -129,8 +199,9 @@ class FFCRnn(nn.Module):
 
 if __name__ == '__main__':
     # ffc_rnn = FFCRnn(32, 32, 32, 32)
-    model = FFCRnn(output_number=41, nh=256, n_rnn=5, feature_extractor="cnn")
-    #cnn = CNN(image_height=32, nc=1)
+    # model = FFCRnn(output_number=41, nh=256, n_rnn=5, feature_extractor="cnn")
+    # model = FFCRnn(output_number=41, nh=256, n_rnn=5, feature_extractor="cnn")
+    model = SimpleFFC(image_height=32, nc=1)
     tensor = torch.zeros([10, 1, 32, 256], dtype=torch.float32)
     res = model(tensor)
     # ffc_rnn = FFCRnn(32, 1, 64, 64)

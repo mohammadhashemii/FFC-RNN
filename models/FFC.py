@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+
+
 # import FFCResnet
 
 class FfcseBlock(nn.Module):
@@ -133,6 +135,8 @@ class FFC(nn.Module):
         in_cl = in_channels - in_cg
         out_cg = int(out_channels * ratio_gout)
         out_cl = out_channels - out_cg
+        self.in_cg = in_cg
+        self.in_cl = in_cl
 
         # print("in_cg", in_cg)
         # print("in_cl", in_cl)
@@ -158,7 +162,8 @@ class FFC(nn.Module):
         # self.conv_g2g = module(in_cg, out_cg, stride, 1 if groups == 1 else groups // 2, False)
 
     def forward(self, x):
-        x_l, x_g = x if type(x) is tuple else (x, 0)
+        # x_l, x_g = x if type(x) is tuple else (x, 0)
+        x_l, x_g = x if type(x) is tuple else (x[:, :self.in_cl, ...], x[:, self.in_cl:, ...])
         out_xl, out_xg = 0, 0
 
         if self.ratio_gout != 1:
@@ -175,7 +180,7 @@ class FfcBnAct(nn.Module):
                  kernel_size, ratio_gin, ratio_gout,
                  stride=1, padding=0, dilation=1, groups=1, bias=False,
                  norm_layer=nn.BatchNorm2d, activation_layer=nn.Identity,
-                 enable_lfu=True):
+                 enable_lfu=True, merge=False):
         super(FfcBnAct, self).__init__()
 
         self.ffc = FFC(in_channels, out_channels, kernel_size,
@@ -193,10 +198,14 @@ class FfcBnAct(nn.Module):
 
         self.act_l = l_act(inplace=True)
         self.act_g = g_act(inplace=True)
+        self.merge = merge
 
     def forward(self, x):
         x_l, x_g = self.ffc(x)
         x_l = self.act_l(self.bn_l(x_l))
         x_g = self.act_g(self.bn_g(x_g))
 
-        return x_l, x_g
+        if self.merge:
+            return torch.cat((x_l, x_g), dim=1)
+        else:
+            return x_l, x_g
