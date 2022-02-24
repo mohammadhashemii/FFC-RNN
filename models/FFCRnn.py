@@ -33,7 +33,7 @@ class SimpleFFC(nn.Module):
                 ffc.add_module('batchnorm{0}'.format(i), nn.BatchNorm2d(output_channels))
             ffc.add_module('relu{0}'.format(i), nn.ReLU(True))
 
-        def ffc_relu(i):
+        def ffc_relu(i, dropout=False):
             input_channels = nc if i == 0 else nm[i - 1]
             output_channels = nm[i]
 
@@ -47,6 +47,8 @@ class SimpleFFC(nn.Module):
                                     enable_lfu=self.lfu,
                                     merge=True)
                            )
+            if dropout:
+                ffc.add_module('dropout{0}'.format(i), nn.Dropout(0.5))
 
         conv_relu(0)
         ffc.add_module('pooling{0}'.format(0), nn.MaxPool2d(2, 2))  # (64, img_height // 2, img_width // 2)
