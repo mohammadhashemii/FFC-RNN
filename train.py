@@ -7,10 +7,8 @@ from torch.utils.data import DataLoader
 from dataset import SadriDataset
 from tqdm import tqdm
 from models.FFCRnn import FFCRnn
-from models.FFCResnet import *
 from losses.CTC_loss import compute_ctc_loss
-from torchsummary import summary
-from utils import ctc_decode, save_vocab_dict
+from utils import ctc_decode
 import torch.nn.functional as F
 from metric import HandwrittenRecognitionMetrics
 
@@ -21,6 +19,8 @@ parser.add_argument('--exp_dir', default='experiments', help='path to experiment
 # training
 parser.add_argument('--exp', required=True, type=str, help='experiments number e.g. 01')
 parser.add_argument('--resume', type=str, default=None, help='path to the checkpoint')
+parser.add_argument('--feature_extractor', type=str, required=True, help='feature extractor name (e.g. ffc_resnet18)')
+parser.add_argument('--n_rnn', type=int, default=3, help='number of LSTM layers')
 parser.add_argument('--n_epochs', type=int, default=100, help='number of epochs for training')
 parser.add_argument('--batch_size', type=int, default=128, help='batch size')
 parser.add_argument('--imgH', type=int, default=32, help='input image height')
@@ -60,8 +60,8 @@ n_train = len(train_dataset)
 
 ffc_rnn = FFCRnn(nh=256,
                  output_number=len(train_dataset.wv.word_vocab) + 1,
-                 n_rnn=2,
-                 feature_extractor="ffc_resnet18")
+                 n_rnn=args.n_rnn,
+                 feature_extractor=args.feature_extractor)
 
 ffc_rnn.to(device=device)
 if args.resume is not None:
@@ -75,7 +75,7 @@ optimizer = torch.optim.Adam(ffc_rnn.parameters(),
 # Initialize logging
 training_configs = dict(exp=args.exp, epochs=args.n_epochs,
                         batch_size=args.batch_size, learning_rate=args.learning_rate,
-                        device=device.type)
+                        device=device.type, feature_extractor=args.feature_extractor, n_rnn = args.n_rnn)
 json_path = os.path.join(args.exp_dir, args.exp, f"training_configs.json")
 with open(json_path, "w") as jf:
     json.dump(training_configs, jf)
