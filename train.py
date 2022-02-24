@@ -159,7 +159,7 @@ for epoch in range(args.n_epochs):
         with open(log_file_path, "a") as f:
 
             loss_msg = f"\nTrain CTC loss: {round(avg_train_loss.item(), 2)}, Val CTC loss:{round(avg_val_loss.item(), 2)}"
-            metric_msg = f"Train SER: {round(train_ser, 2)}\tTrain WER:{round(train_wer, 2)}\tVal SER: {round(val_ser, 2)}\tVal WER:{round(val_wer, 2)}"
+            metric_msg = f"Train SER: {round(100*train_ser, 2)}\tTrain WER:{round(100*train_wer, 2)}\tVal SER: {round(100*val_ser, 2)}\tVal WER:{round(100*val_wer, 2)}"
             print(f"{loss_msg}\n{metric_msg}\n")
             f.write(f"{loss_msg}\n{metric_msg}\n")
         f.close()

@@ -101,5 +101,5 @@ avg_val_loss = torch.mean(torch.tensor(val_loss_list))
 test_wer = test_metric.wer
 test_ser = test_metric.ser
 
-log_file.write(f"Total CTC loss: {round(avg_val_loss.item(), 2)}, SER: {round(test_ser, 2)}, WER: {round(test_wer, 2)}")
+log_file.write(f"Total CTC loss: {round(avg_val_loss.item(), 2)}, SER: {round(100*test_ser, 2)}, WER: {round(100*test_wer, 2)}")
 log_file.close()
