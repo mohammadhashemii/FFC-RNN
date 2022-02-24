@@ -10,6 +10,7 @@ from models.FFCResnet import *
 from losses.CTC_loss import compute_ctc_loss
 from utils import ctc_decode
 import torch.nn.functional as F
+from metric import HandwrittenRecognitionMetrics
 
 parser = argparse.ArgumentParser()
 # directories
@@ -63,9 +64,9 @@ log_file = open(log_file_path, "a")
 
 # testing
 ffc_rnn.eval()
-tot_correct = 0
 wrong_cases = []
 val_loss_list = []
+test_metric = HandwrittenRecognitionMetrics()
 for batch in test_loader:
     images = batch['image'].to(device=device, dtype=torch.float32)
     labels = batch['label'].to(device=device, dtype=torch.int)
@@ -86,15 +87,19 @@ for batch in test_loader:
             l = SadriDataset.wv.num_to_word(label_indices)
             words = [w for w in l if w != '<unk>']
             ground_truth_sentence = " ".join(words)
-            if ground_truth_sentence == decoded_preds[i]:
-                tot_correct += 1
-            else:
+
+            # update WER and SER metrics for one epoch
+            test_metric.update_metric(decoded_preds[i], ground_truth_sentence)
+
+            if ground_truth_sentence != decoded_preds[i]:
                 wrong_cases.append((ground_truth_sentence, decoded_preds[i]))
                 log_file.write("----------------------\n")
                 log_file.write(f"Ground Truth: {ground_truth_sentence}\n")
                 log_file.write(f"Model Prediction: {decoded_preds[i]}\n")
 
 avg_val_loss = torch.mean(torch.tensor(val_loss_list))
-val_accuracy = tot_correct / test_dataset.num_samples
-log_file.write(f"Total loss: {avg_val_loss}, Total accuracy: {val_accuracy}")
+test_wer = test_metric.wer
+test_ser = test_metric.ser
+
+log_file.write(f"Total CTC loss: {round(avg_val_loss.item(), 2)}, SER: {round(test_ser, 2)}, WER: {round(test_wer, 2)}")
 log_file.close()

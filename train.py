@@ -12,6 +12,7 @@ from losses.CTC_loss import compute_ctc_loss
 from torchsummary import summary
 from utils import ctc_decode, save_vocab_dict
 import torch.nn.functional as F
+from metric import HandwrittenRecognitionMetrics
 
 parser = argparse.ArgumentParser()
 # directories
@@ -80,21 +81,16 @@ with open(json_path, "w") as jf:
     json.dump(training_configs, jf)
 print(f"Training configs:\n {training_configs}")
 
-# model_summary = summary(ffc_rnn, (1, args.imgH, args.imgW), batch_size=-1, device='cuda')
-# model_summary_path = os.path.join(args.exp_dir, args.exp, f"model_summary.txt")
-# with open(model_summary, "w") as f:
-#    f.write(model_summary)
-#    f.close()
 
 # training
 epoch_train_loss_list = []
 epoch_val_loss_list = []
-least_loss = None
+least_ser = None
 for epoch in range(args.n_epochs):
     ############## Training ##############
     ffc_rnn.train()
-    tot_correct = 0
     wrong_cases = []
+    train_metric = HandwrittenRecognitionMetrics()
     with tqdm(total=n_train, desc=f"Epoch {epoch + 1}/{args.n_epochs}", unit='img') as pbar:
         for batch in train_loader:
             images = batch['image'].to(device=device, dtype=torch.float32)  # (batch, c=1, imgH, imgW)
@@ -119,18 +115,18 @@ for epoch in range(args.n_epochs):
                 l = SadriDataset.wv.num_to_word(label_indices)
                 words = [w for w in l if w != '<unk>']
                 ground_truth_sentence = " ".join(words)
-                if ground_truth_sentence == decoded_preds[i]:
-                    tot_correct += 1
-                else:
-                    wrong_cases.append((ground_truth_sentence, decoded_preds[i]))
+
+                # update WER and SER metrics for one epoch
+                train_metric.update_metric(decoded_preds[i], ground_truth_sentence)
 
         avg_train_loss = torch.mean(torch.tensor(epoch_train_loss_list))
-        train_accuracy = tot_correct / train_dataset.num_samples
+        train_wer = train_metric.wer
+        train_ser = train_metric.ser
 
         ############## validation ##############
         ffc_rnn.eval()
-        tot_correct = 0
         wrong_cases = []
+        val_metric = HandwrittenRecognitionMetrics()
         for batch in test_loader:
             images = batch['image'].to(device=device, dtype=torch.float32)
             labels = batch['label'].to(device=device, dtype=torch.int)
@@ -150,26 +146,28 @@ for epoch in range(args.n_epochs):
                     l = SadriDataset.wv.num_to_word(label_indices)
                     words = [w for w in l if w != '<unk>']
                     ground_truth_sentence = " ".join(words)
-                    if ground_truth_sentence == decoded_preds[i]:
-                        tot_correct += 1
-                    else:
-                        wrong_cases.append((ground_truth_sentence, decoded_preds[i]))
+
+                    # update WER and SER metrics for one epoch
+                    val_metric.update_metric(decoded_preds[i], ground_truth_sentence)
 
         avg_val_loss = torch.mean(torch.tensor(epoch_val_loss_list))
-        val_accuracy = tot_correct / test_dataset.num_samples
+        val_wer = val_metric.wer
+        val_ser = val_metric.ser
 
         # log losses and ... in a text file
         log_file_path = os.path.join(args.exp_dir, args.exp, f"training.log")
         with open(log_file_path, "a") as f:
-            msg = f"Train loss: {avg_train_loss}, Train acc:{train_accuracy}, Test loss:{avg_val_loss}, Val acc:{val_accuracy}\n"
-            print(msg)
-            f.write(msg)
+
+            loss_msg = f"\nTrain CTC loss: {round(avg_train_loss.item(), 2)}, Val CTC loss:{round(avg_val_loss.item(), 2)}"
+            metric_msg = f"Train SER: {round(train_ser, 2)}\tTrain WER:{round(train_wer, 2)}\tVal SER: {round(val_ser, 2)}\tVal WER:{round(val_wer, 2)}"
+            print(f"{loss_msg}\n{metric_msg}\n")
+            f.write(f"{loss_msg}\n{metric_msg}\n")
         f.close()
 
         # do checkpointing
         if not os.path.exists(os.path.join(args.exp_dir, args.exp, 'checkpoints')):
             os.makedirs(os.path.join(args.exp_dir, args.exp, 'checkpoints'))
-        if least_loss is None or avg_val_loss < least_loss:
-            checkpoint_path = os.path.join(args.exp_dir, args.exp, 'checkpoints', f"checkpoint_best")
+        if least_ser is None or val_ser < least_ser:
+            checkpoint_path = os.path.join(args.exp_dir, args.exp, 'checkpoints', f"checkpoint_best.pth")
             torch.save(ffc_rnn.state_dict(), checkpoint_path)
-            least_loss = avg_val_loss
+            least_ser = val_ser
