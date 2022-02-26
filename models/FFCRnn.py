@@ -89,7 +89,7 @@ class CNN(nn.Module):
 
         cnn = nn.Sequential()
 
-        def conv_relu(i, batch_normalization=False):
+        def conv_relu(i, batch_normalization=False, dropout=False):
             input_channels = nc if i == 0 else nm[i - 1]
             output_channels = nm[i]
 
@@ -97,6 +97,8 @@ class CNN(nn.Module):
                            nn.Conv2d(input_channels, output_channels, (kernel_sizes[i], kernel_sizes[i]),
                                      (stride_sizes[i], stride_sizes[i]), padding_sizes[i]))
 
+            if dropout:
+                cnn.add_module('dropout{0}'.format(i), nn.Dropout(0.2))
             if batch_normalization:
                 cnn.add_module('batchnorm{0}'.format(i), nn.BatchNorm2d(output_channels))
             if leaky_relu:
@@ -104,17 +106,17 @@ class CNN(nn.Module):
             else:
                 cnn.add_module('relu{0}'.format(i), nn.ReLU(True))
 
-        conv_relu(0)
+        conv_relu(0, batch_normalization=True, dropout=False)
         cnn.add_module('pooling{0}'.format(0), nn.MaxPool2d(2, 2))  # (64, img_height // 2, img_width // 2)
-        conv_relu(1)
+        conv_relu(1, batch_normalization=True, dropout=False)
         cnn.add_module('pooling{0}'.format(1), nn.MaxPool2d(2, 2))  # (128, img_height // 4, img_width // 4)
-        conv_relu(2)
+        conv_relu(2, batch_normalization=True, dropout=False)
         cnn.add_module('pooling{0}'.format(2), nn.MaxPool2d((2, 2)))  # (256, img_height // 8, img_width // 4)
-        conv_relu(3)
+        conv_relu(3, batch_normalization=True, dropout=True)
         cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((1, 2)))  # 256 x 4 x 16
-        conv_relu(4)
+        conv_relu(4, batch_normalization=True, dropout=True)
         cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((2, 1)))
-        conv_relu(5)
+        conv_relu(5, batch_normalization=False, dropout=True)
 
         # cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((1, 2)))
         # conv_relu(5)
