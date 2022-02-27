@@ -174,3 +174,4 @@ for epoch in range(args.n_epochs):
             torch.save(ffc_rnn.state_dict(), checkpoint_path)
             least_ser = val_ser
         checkpoint_path = os.path.join(args.exp_dir, args.exp, 'checkpoints', f"checkpoint_last.pth")
+        torch.save(ffc_rnn.state_dict(), checkpoint_path)
