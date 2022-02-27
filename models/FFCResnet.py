@@ -211,7 +211,8 @@ def ffc_resnet18(pretrained=False, **kwargs):
     Args:
         pretrained (bool): If True, returns a model pretrained on ImageNet
     """
-    model = FFCResNet(BasicBlock, [2, 2, 2, 2], **kwargs)
+    # model = FFCResNet(BasicBlock, [2, 2, 2, 2], **kwargs)
+    model = FFCResNet(BasicBlock, [1, 1, 1, 1], **kwargs)
     return model
 
 

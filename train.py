@@ -20,6 +20,7 @@ parser.add_argument('--exp_dir', default='experiments', help='path to experiment
 parser.add_argument('--exp', required=True, type=str, help='experiments number e.g. 01')
 parser.add_argument('--resume', type=str, default=None, help='path to the checkpoint')
 parser.add_argument('--feature_extractor', type=str, required=True, help='feature extractor name (e.g. ffc_resnet18)')
+parser.add_argument('--use_attention', type=int, required=True, help='use attention layer')
 parser.add_argument('--n_rnn', type=int, default=3, help='number of LSTM layers')
 parser.add_argument('--n_epochs', type=int, default=100, help='number of epochs for training')
 parser.add_argument('--batch_size', type=int, default=128, help='batch size')
@@ -61,7 +62,8 @@ n_train = len(train_dataset)
 ffc_rnn = FFCRnn(nh=256,
                  output_number=len(train_dataset.wv.word_vocab) + 1,
                  n_rnn=args.n_rnn,
-                 feature_extractor=args.feature_extractor)
+                 feature_extractor=args.feature_extractor,
+                 use_attention=bool(args.use_attention))
 
 ffc_rnn.to(device=device)
 if args.resume is not None:
@@ -75,12 +77,12 @@ optimizer = torch.optim.Adam(ffc_rnn.parameters(),
 # Initialize logging
 training_configs = dict(exp=args.exp, epochs=args.n_epochs,
                         batch_size=args.batch_size, learning_rate=args.learning_rate,
-                        device=device.type, feature_extractor=args.feature_extractor, n_rnn = args.n_rnn)
+                        device=device.type, feature_extractor=args.feature_extractor, n_rnn=args.n_rnn,
+                        use_attention=bool(args.use_attention))
 json_path = os.path.join(args.exp_dir, args.exp, f"training_configs.json")
 with open(json_path, "w") as jf:
     json.dump(training_configs, jf)
 print(f"Training configs:\n {training_configs}")
-
 
 # training
 epoch_train_loss_list = []
@@ -157,11 +159,11 @@ for epoch in range(args.n_epochs):
         # log losses and ... in a text file
         log_file_path = os.path.join(args.exp_dir, args.exp, f"training.log")
         with open(log_file_path, "a") as f:
-
+            epoch_msg = f"Epoch: {epoch}"
             loss_msg = f"\nTrain CTC loss: {round(avg_train_loss.item(), 2)}, Val CTC loss:{round(avg_val_loss.item(), 2)}"
-            metric_msg = f"Train SER: {round(100*train_ser, 2)}\tTrain WER:{round(100*train_wer, 2)}\tVal SER: {round(100*val_ser, 2)}\tVal WER:{round(100*val_wer, 2)}"
-            print(f"{loss_msg}\n{metric_msg}\n")
-            f.write(f"{loss_msg}\n{metric_msg}\n")
+            metric_msg = f"Train SER: {round(100 * train_ser, 2)}\tTrain WER:{round(100 * train_wer, 2)}\tVal SER: {round(100 * val_ser, 2)}\tVal WER:{round(100 * val_wer, 2)}"
+            print(f"{epoch_msg}\t{loss_msg}\n{metric_msg}\n")
+            f.write(f"{epoch_msg}\t{loss_msg}\n{metric_msg}\n")
         f.close()
 
         # do checkpointing
@@ -171,3 +173,4 @@ for epoch in range(args.n_epochs):
             checkpoint_path = os.path.join(args.exp_dir, args.exp, 'checkpoints', f"checkpoint_best.pth")
             torch.save(ffc_rnn.state_dict(), checkpoint_path)
             least_ser = val_ser
+        checkpoint_path = os.path.join(args.exp_dir, args.exp, 'checkpoints', f"checkpoint_last.pth")
