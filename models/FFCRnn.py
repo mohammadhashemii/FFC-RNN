@@ -33,7 +33,7 @@ class SimpleFFC(nn.Module):
                 ffc.add_module('batchnorm{0}'.format(i), nn.BatchNorm2d(output_channels))
             ffc.add_module('relu{0}'.format(i), nn.ReLU(True))
 
-        def ffc_relu(i, dropout=False):
+        def ffc_relu(i, batch_normalization=False, dropout=False):
             input_channels = nc if i == 0 else nm[i - 1]
             output_channels = nm[i]
 
@@ -47,20 +47,24 @@ class SimpleFFC(nn.Module):
                                     enable_lfu=self.lfu,
                                     merge=True)
                            )
-            if dropout:
-                ffc.add_module('dropout{0}'.format(i), nn.Dropout(0.5))
 
-        conv_relu(0)
+            if batch_normalization:
+                ffc.add_module('batchnorm{0}'.format(i), nn.BatchNorm2d(output_channels))
+
+            if dropout:
+                ffc.add_module('dropout{0}'.format(i), nn.Dropout(0.2))
+
+        conv_relu(0, batch_normalization=True)
         ffc.add_module('pooling{0}'.format(0), nn.MaxPool2d(2, 2))  # (64, img_height // 2, img_width // 2)
-        ffc_relu(1)
+        ffc_relu(1, batch_normalization=True, dropout=False)
         ffc.add_module('pooling{0}'.format(1), nn.MaxPool2d(2, 2))  # (128, img_height // 4, img_width // 4)
-        ffc_relu(2)
+        ffc_relu(2, batch_normalization=True, dropout=False)
         ffc.add_module('pooling{0}'.format(2), nn.MaxPool2d((2, 2)))  # (256, img_height // 8, img_width // 4)
-        ffc_relu(3)
+        ffc_relu(3, batch_normalization=True, dropout=True)
         ffc.add_module('pooling{0}'.format(3), nn.MaxPool2d((1, 2)))  # 256 x 4 x 16
-        ffc_relu(4)
+        ffc_relu(4, batch_normalization=True, dropout=True)
         ffc.add_module('pooling{0}'.format(3), nn.MaxPool2d((2, 1)))
-        ffc_relu(5)
+        ffc_relu(5, batch_normalization=False, dropout=True)
 
         # cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((1, 2)))
         # conv_relu(5)
@@ -154,7 +158,7 @@ FEATURE_EXTRACTORS = {'cnn': {'model': CNN(image_height=32, nc=1), "output_chann
 
 class FFCRnn(nn.Module):
 
-    def __init__(self, output_number, nh, n_rnn=2, map_to_seq_hidden=None, feature_extractor=None):
+    def __init__(self, output_number, nh, n_rnn=2, map_to_seq_hidden=None, feature_extractor=None, use_attention=False):
         super(FFCRnn, self).__init__()
 
         self.cnn = FEATURE_EXTRACTORS[feature_extractor]["model"]
@@ -165,7 +169,7 @@ class FFCRnn(nn.Module):
             map_to_seq_hidden = output_channel * output_height
 
         self.attn = SelfAttention(output_channel, None)
-
+        self.use_attention = use_attention
         self.map_to_seq = nn.Linear(output_channel * output_height, map_to_seq_hidden)
 
         self.rnn = nn.Sequential()
@@ -182,8 +186,8 @@ class FFCRnn(nn.Module):
 
         b, c, h, w = conv.size()
         # print(conv.size())
-
-        conv = self.attn(conv)
+        if self.use_attention:
+            conv = self.attn(conv)
         # print(conv.size())
 
         # print(conv.size())
