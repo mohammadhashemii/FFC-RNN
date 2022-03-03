@@ -14,15 +14,26 @@ from sklearn.model_selection import train_test_split
 import pandas as pd
 
 
-def hconcat_resize(img_list):
+def hconcat_resize(img_list, labels, padding=True):
     # take minimum height
     h_max = max(img.shape[0] for img in img_list)
-    white = [255, 255, 255]
-    img_list_resize = [
-        cv2.copyMakeBorder(img, int((h_max - img.shape[0]) / 2), h_max - img.shape[0] - int((h_max - img.shape[0]) / 2),
-                           0, 0, cv2.BORDER_CONSTANT, value=white)
-        for img in img_list]
-
+    img_list_resize = []
+    for idx, img in enumerate(img_list):
+        if padding:
+            white = [255, 255, 255]
+            img_list_resize.append(cv2.copyMakeBorder(img, int((h_max - img.shape[0]) / 2), h_max - img.shape[0] - int((h_max - img.shape[0]) / 2),
+                           0, 0, cv2.BORDER_CONSTANT, value=white))
+        else:
+            if labels[idx] == "و":
+                white = [255, 255, 255]
+                img = cv2.resize(img, (1*(img.shape[1] * h_max // img.shape[0])//2, 1*h_max//2), interpolation=cv2.INTER_AREA)
+                img_list_resize.append(cv2.copyMakeBorder(img, int((h_max - img.shape[0]) / 2),
+                                                          h_max - img.shape[0] - int((h_max - img.shape[0]) / 2),
+                                                          0, 0, cv2.BORDER_CONSTANT, value=white))
+            else:
+                img = cv2.resize(img, (img.shape[1] * h_max // img.shape[0], h_max),
+                                 interpolation=cv2.INTER_AREA)
+                img_list_resize.append(img)
     # return final image
     return cv2.hconcat(img_list_resize)
 
@@ -30,6 +41,7 @@ def hconcat_resize(img_list):
 def create_num_image(num_string, words_base_path='../data/train_words/'):
     words = num_string.split(" ")
     word_img_list = []
+    labels = []
     for word in words:
 
         image_dir_path = words_base_path + str(word) + "/"
@@ -42,8 +54,9 @@ def create_num_image(num_string, words_base_path='../data/train_words/'):
         word_img = cv2.imread(image_dir_path + random_word_image_path)
         # concat word images horizontally
         word_img_list.insert(0, word_img)
+        labels.insert(0, str(word))
 
-    num_string_image = hconcat_resize(word_img_list)
+    num_string_image = hconcat_resize(word_img_list, labels, padding=False)
 
     return num_string_image
 
@@ -64,9 +77,9 @@ def generate_images(images_dir, labels_dir):
         os.mkdir(labels_dir)
 
     # fetch the random numbers generated via randomNumGenerator.py script
-    #random_numbers = read_nums_from_excel(path='../data/CourtesyValues.xlsx')
-    random_numbers = randomNumGenerator.generate_random_num()
-    random.shuffle(random_numbers)
+    random_numbers = read_nums_from_excel(path='../CourtesyValues.xlsx')
+    #random_numbers = randomNumGenerator.generate_random_num()
+    #random.shuffle(random_numbers)
 
     train_samples, test_samples = train_test_split(random_numbers, test_size=0.1)
 
@@ -173,5 +186,5 @@ def split_words_to_train_test(test_size=0.1, train_path="../data/train_words/", 
 
 if __name__ == '__main__':
     generate_images(images_dir='../OurDataset/images/', labels_dir='../OurDataset/labels/')
-    #split_words_to_train_test(test_size=0.1)
+    #split_words_to_train_test(test_size=0.1, train_path="../OurDataset/train_words/", test_path="../OurDataset/test_words/")
     #print(num2word.convert(1111123))
