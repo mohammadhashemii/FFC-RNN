@@ -74,6 +74,7 @@ test_metric = HandwrittenRecognitionMetrics()
 for batch in test_loader:
     images = batch['image'].to(device=device, dtype=torch.float32)
     labels = batch['label'].to(device=device, dtype=torch.int)
+    img_paths = batch['img_path']
     with torch.no_grad():
         preds = ffc_rnn(images)
 
@@ -100,6 +101,7 @@ for batch in test_loader:
                 log_file.write("----------------------\n")
                 log_file.write(f"Ground Truth: {ground_truth_sentence}\n")
                 log_file.write(f"Model Prediction: {decoded_preds[i]}\n")
+                log_file.write(f"{img_paths[i]}\n")
 
 avg_val_loss = torch.mean(torch.tensor(val_loss_list))
 test_wer = test_metric.wer
