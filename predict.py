@@ -19,6 +19,9 @@ parser.add_argument('--model_state_path', required=True, help='path to model wei
 parser.add_argument('--data_root', default='data', help='path to dataset directory')
 parser.add_argument('--inference_root', default='inference', help='path to saved results directory')
 # testing
+parser.add_argument('--feature_extractor', type=str, required=True, help='feature extractor name (e.g. ffc_resnet18)')
+parser.add_argument('--use_attention', type=int, required=True, help='use attention layer')
+parser.add_argument('--n_rnn', type=int, default=3, help='number of LSTM layers')
 parser.add_argument('--batch_size', type=int, default=128, help='batch size')
 parser.add_argument('--imgH', type=int, default=32, help='input image height')
 parser.add_argument('--imgW', type=int, default=256, help='input image width')
@@ -50,8 +53,9 @@ test_loader = DataLoader(test_dataset, shuffle=False, **loader_args)
 # load the model
 ffc_rnn = FFCRnn(nh=256,
                  output_number=len(train_dataset.wv.word_vocab) + 1,
-                 n_rnn=4,
-                 feature_extractor="ffc_resnet18")
+                 n_rnn=args.n_rnn,
+                 feature_extractor=args.feature_extractor,
+                 use_attention=bool(args.use_attention))
 
 ffc_rnn.to(device=device)
 # load the weights
@@ -70,6 +74,7 @@ test_metric = HandwrittenRecognitionMetrics()
 for batch in test_loader:
     images = batch['image'].to(device=device, dtype=torch.float32)
     labels = batch['label'].to(device=device, dtype=torch.int)
+    img_paths = batch['img_path']
     with torch.no_grad():
         preds = ffc_rnn(images)
 
@@ -96,6 +101,7 @@ for batch in test_loader:
                 log_file.write("----------------------\n")
                 log_file.write(f"Ground Truth: {ground_truth_sentence}\n")
                 log_file.write(f"Model Prediction: {decoded_preds[i]}\n")
+                log_file.write(f"{img_paths[i]}\n")
 
 avg_val_loss = torch.mean(torch.tensor(val_loss_list))
 test_wer = test_metric.wer

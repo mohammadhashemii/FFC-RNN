@@ -3,6 +3,8 @@ import os
 import json
 
 import torch
+import torch.nn as nn
+from torch.optim.lr_scheduler import StepLR
 from torch.utils.data import DataLoader
 from dataset import SadriDataset
 from tqdm import tqdm
@@ -19,16 +21,19 @@ parser.add_argument('--exp_dir', default='experiments', help='path to experiment
 # training
 parser.add_argument('--exp', required=True, type=str, help='experiments number e.g. 01')
 parser.add_argument('--resume', type=str, default=None, help='path to the checkpoint')
+parser.add_argument('--pretrained', default=False, action="store_true", help='use pretrained model')
+parser.add_argument('--finetune', default=False, action="store_true", help='fine-tune the model with lr=1e-5')
 parser.add_argument('--feature_extractor', type=str, required=True, help='feature extractor name (e.g. ffc_resnet18)')
-parser.add_argument('--use_attention', type=int, required=True, help='use attention layer')
+parser.add_argument('--use_attention', default=False, action="store_true", help='use attention layer')
 parser.add_argument('--n_rnn', type=int, default=3, help='number of LSTM layers')
 parser.add_argument('--n_epochs', type=int, default=100, help='number of epochs for training')
 parser.add_argument('--batch_size', type=int, default=128, help='batch size')
 parser.add_argument('--imgH', type=int, default=32, help='input image height')
 parser.add_argument('--imgW', type=int, default=256, help='input image width')
-parser.add_argument('--learning_rate', type=float, default=0.001, help='learning rate')
+parser.add_argument('--learning_rate', type=float, default=0.01, help='learning rate')
+parser.add_argument('--learning_rate_decay', type=float, default=0.1, help='learning rate decay steps')
 parser.add_argument('--momentum', type=float, default=0.9, help='momentum')
-parser.add_argument('--num_workers', type=int, default=1, help='number of workers')
+parser.add_argument('--num_workers', type=int, default=2, help='number of workers')
 args = parser.parse_args()
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 if not torch.cuda.is_available():
@@ -63,22 +68,40 @@ ffc_rnn = FFCRnn(nh=256,
                  output_number=len(train_dataset.wv.word_vocab) + 1,
                  n_rnn=args.n_rnn,
                  feature_extractor=args.feature_extractor,
-                 use_attention=bool(args.use_attention))
+                 use_attention=args.use_attention)
 
 ffc_rnn.to(device=device)
 if args.resume is not None:
     ffc_rnn.load_state_dict(torch.load(os.path.join(args.exp_dir, args.exp, args.resume)))
     print(f"Model weights {os.path.join(args.exp_dir, args.exp, args.resume)} loaded!")
 
+
+lr = args.learning_rate
+
+if args.pretrained: # freeze the model params
+    print("Using pretrained model weights!")
+    for param in ffc_rnn.parameters():
+        param.requires_grad = False
+
+    num_ftrs = ffc_rnn.fc.in_features
+    ffc_rnn.fc = nn.Linear(num_ftrs, len(train_dataset.wv.word_vocab) + 1)  # unfreeze the last fc layer
+    ffc_rnn.to(device=device)
+
+if args.finetune:
+    print("Fine-tuning mode!")
+    lr = 1e-5   # reduce the chance of over-fitting
+
 # set up optimizer, learning rate, etc.
 optimizer = torch.optim.Adam(ffc_rnn.parameters(),
-                             lr=args.learning_rate)
+                             lr=lr)
+scheduler = StepLR(optimizer, step_size=40, gamma=args.learning_rate_decay)
 
 # Initialize logging
 training_configs = dict(exp=args.exp, epochs=args.n_epochs,
-                        batch_size=args.batch_size, learning_rate=args.learning_rate,
+                        batch_size=args.batch_size, num_workers=args.num_workers, learning_rate=lr,
+                        learning_rate_decay=args.learning_rate_decay,
                         device=device.type, feature_extractor=args.feature_extractor, n_rnn=args.n_rnn,
-                        use_attention=bool(args.use_attention))
+                        use_attention=args.use_attention)
 json_path = os.path.join(args.exp_dir, args.exp, f"training_configs.json")
 with open(json_path, "w") as jf:
     json.dump(training_configs, jf)
@@ -156,6 +179,9 @@ for epoch in range(args.n_epochs):
         val_wer = val_metric.wer
         val_ser = val_metric.ser
 
+        # schedule the LR
+        scheduler.step()
+
         # log losses and ... in a text file
         log_file_path = os.path.join(args.exp_dir, args.exp, f"training.log")
         with open(log_file_path, "a") as f:
@@ -174,3 +200,4 @@ for epoch in range(args.n_epochs):
             torch.save(ffc_rnn.state_dict(), checkpoint_path)
             least_ser = val_ser
         checkpoint_path = os.path.join(args.exp_dir, args.exp, 'checkpoints', f"checkpoint_last.pth")
+        torch.save(ffc_rnn.state_dict(), checkpoint_path)

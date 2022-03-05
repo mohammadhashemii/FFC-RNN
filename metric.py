@@ -9,7 +9,7 @@ class HandwrittenRecognitionMetrics:
         self.n_words = 0
 
     def update_metric(self, sample: str, ground_truth: str):
-        measures = compute_measures(ground_truth, sample)
+        measures = jiwer.compute_measures(ground_truth, sample)
         word_errors = self.wer * self.n_words + (
                     measures['substitutions'] + measures['deletions'] + measures['insertions'])
         ser_sum = self.ser * self.n_smaples + int(ground_truth != sample)

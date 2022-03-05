@@ -39,6 +39,7 @@ class SadriDataset(Dataset):
         img = torchvision.io.read_image(img_path)
         label = self.paths_and_labels['labels_list'][idx]
         sample = self._preprocess_image_and_label(img, label)
+        sample['img_path'] = img_path
 
         return sample  # image, label
 
