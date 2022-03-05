@@ -22,7 +22,7 @@ class SimpleFFC(nn.Module):
 
         ffc = nn.Sequential()
 
-        def conv_relu(i, batch_normalization=False):
+        def conv_relu(i, batch_normalization=False, attention=False):
             input_channels = nc if i == 0 else nm[i - 1]
             output_channels = nm[i]
             ffc.add_module('conv{0}'.format(i),
@@ -31,9 +31,13 @@ class SimpleFFC(nn.Module):
 
             if batch_normalization:
                 ffc.add_module('batchnorm{0}'.format(i), nn.BatchNorm2d(output_channels))
+
             ffc.add_module('relu{0}'.format(i), nn.ReLU(True))
 
-        def ffc_relu(i, batch_normalization=False, dropout=False):
+            if attention:
+                ffc.add_module('attention{0}'.format(i), SelfAttention(output_channels, None))
+
+        def ffc_relu(i, batch_normalization=False, dropout=False, attention=False):
             input_channels = nc if i == 0 else nm[i - 1]
             output_channels = nm[i]
 
@@ -54,17 +58,20 @@ class SimpleFFC(nn.Module):
             if dropout:
                 ffc.add_module('dropout{0}'.format(i), nn.Dropout(0.2))
 
-        conv_relu(0, batch_normalization=True)
+            if attention:
+                ffc.add_module('attention{0}'.format(i), SelfAttention(output_channels, None))
+
+        conv_relu(0, batch_normalization=True, attention=False)
         ffc.add_module('pooling{0}'.format(0), nn.MaxPool2d(2, 2))  # (64, img_height // 2, img_width // 2)
-        ffc_relu(1, batch_normalization=True, dropout=False)
+        ffc_relu(1, batch_normalization=True, dropout=False, attention=False)
         ffc.add_module('pooling{0}'.format(1), nn.MaxPool2d(2, 2))  # (128, img_height // 4, img_width // 4)
-        ffc_relu(2, batch_normalization=True, dropout=False)
+        ffc_relu(2, batch_normalization=True, dropout=False, attention=False)
         ffc.add_module('pooling{0}'.format(2), nn.MaxPool2d((2, 2)))  # (256, img_height // 8, img_width // 4)
-        ffc_relu(3, batch_normalization=True, dropout=True)
+        ffc_relu(3, batch_normalization=True, dropout=True, attention=False)
         ffc.add_module('pooling{0}'.format(3), nn.MaxPool2d((1, 2)))  # 256 x 4 x 16
-        ffc_relu(4, batch_normalization=True, dropout=True)
+        ffc_relu(4, batch_normalization=True, dropout=True, attention=False)
         ffc.add_module('pooling{0}'.format(3), nn.MaxPool2d((2, 1)))
-        ffc_relu(5, batch_normalization=False, dropout=True)
+        ffc_relu(5, batch_normalization=False, dropout=True, attention=False)
 
         # cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((1, 2)))
         # conv_relu(5)
@@ -207,9 +214,9 @@ class FFCRnn(nn.Module):
 
 if __name__ == '__main__':
     # ffc_rnn = FFCRnn(32, 32, 32, 32)
+    model = FFCRnn(output_number=41, nh=256, n_rnn=5, feature_extractor="ffc")
     # model = FFCRnn(output_number=41, nh=256, n_rnn=5, feature_extractor="cnn")
-    # model = FFCRnn(output_number=41, nh=256, n_rnn=5, feature_extractor="cnn")
-    model = SimpleFFC(image_height=32, nc=1)
+    # model = SimpleFFC(image_height=32, nc=1)
     tensor = torch.zeros([10, 1, 32, 256], dtype=torch.float32)
     res = model(tensor)
     # ffc_rnn = FFCRnn(32, 1, 64, 64)
