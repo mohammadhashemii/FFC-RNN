@@ -33,7 +33,7 @@ parser.add_argument('--imgW', type=int, default=256, help='input image width')
 parser.add_argument('--learning_rate', type=float, default=0.01, help='learning rate')
 parser.add_argument('--learning_rate_decay', type=float, default=0.1, help='learning rate decay steps')
 parser.add_argument('--momentum', type=float, default=0.9, help='momentum')
-parser.add_argument('--num_workers', type=int, default=1, help='number of workers')
+parser.add_argument('--num_workers', type=int, default=2, help='number of workers')
 args = parser.parse_args()
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 if not torch.cuda.is_available():
@@ -98,7 +98,7 @@ scheduler = StepLR(optimizer, step_size=40, gamma=args.learning_rate_decay)
 
 # Initialize logging
 training_configs = dict(exp=args.exp, epochs=args.n_epochs,
-                        batch_size=args.batch_size, learning_rate=lr,
+                        batch_size=args.batch_size, num_workers=args.num_workers, learning_rate=lr,
                         learning_rate_decay=args.learning_rate_decay,
                         device=device.type, feature_extractor=args.feature_extractor, n_rnn=args.n_rnn,
                         use_attention=args.use_attention)
