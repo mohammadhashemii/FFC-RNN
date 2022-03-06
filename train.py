@@ -13,6 +13,7 @@ from losses.CTC_loss import compute_ctc_loss
 from utils import ctc_decode
 import torch.nn.functional as F
 from metric import HandwrittenRecognitionMetrics
+from utils import visualize_samples
 
 parser = argparse.ArgumentParser()
 # directories
@@ -46,6 +47,8 @@ if not os.path.exists(os.path.join(args.exp_dir, args.exp)):
 img_size = (args.imgW, args.imgH)
 train_dataset = SadriDataset(root_dir=args.data_root, img_size=img_size, is_training_set=True)
 test_dataset = SadriDataset(root_dir=args.data_root, img_size=img_size, is_training_set=False)
+#visualize_samples(train_dataset, SadriDataset.wv.num_to_word, random_img=True, n_samples=20)
+
 
 loader_args = dict(batch_size=args.batch_size,
                    num_workers=args.num_workers,

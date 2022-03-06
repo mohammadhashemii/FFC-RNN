@@ -16,8 +16,9 @@ class SimpleFFC(nn.Module):
         stride_sizes = [1, 1, 1, 1, 1, 1]
         # nm = [64, 128, 256, 256, 512, 512, 512]
         nm = [16, 32, 48, 64, 80, 128]
-        self.ratio_gin = ratio_gin
-        self.ratio_gout = ratio_gout
+
+        self.ratio_gin = [0, 0.25, 0.5, 0.5, 0.75]
+        self.ratio_gout = [0, 0.5, 0.5, 0.5, 0.5]
         self.lfu = lfu
 
         ffc = nn.Sequential()
@@ -46,7 +47,7 @@ class SimpleFFC(nn.Module):
                                     kernel_size=(kernel_sizes[i], kernel_sizes[i]),
                                     padding=padding_sizes[i],
                                     stride=stride_sizes[i],
-                                    ratio_gin=self.ratio_gin, ratio_gout=self.ratio_gout,
+                                    ratio_gin=self.ratio_gin[i], ratio_gout=self.ratio_gout[i],
                                     activation_layer=nn.ReLU,
                                     enable_lfu=self.lfu,
                                     merge=True)
@@ -69,9 +70,9 @@ class SimpleFFC(nn.Module):
         ffc.add_module('pooling{0}'.format(2), nn.MaxPool2d((2, 2)))  # (256, img_height // 8, img_width // 4)
         ffc_relu(3, batch_normalization=True, dropout=True, attention=False)
         ffc.add_module('pooling{0}'.format(3), nn.MaxPool2d((1, 2)))  # 256 x 4 x 16
-        ffc_relu(4, batch_normalization=True, dropout=True, attention=False)
+        ffc_relu(4, batch_normalization=False, dropout=True, attention=False)
         ffc.add_module('pooling{0}'.format(3), nn.MaxPool2d((2, 1)))
-        ffc_relu(5, batch_normalization=False, dropout=True, attention=False)
+        #ffc_relu(5, batch_normalization=False, dropout=True, attention=True)
 
         # cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((1, 2)))
         # conv_relu(5)
@@ -155,7 +156,7 @@ class BiLSTM(nn.Module):
 
 
 FEATURE_EXTRACTORS = {'cnn': {'model': CNN(image_height=32, nc=1), "output_channel": 128, "output_height": 2},
-                      'ffc': {'model': SimpleFFC(image_height=32, nc=1, lfu=True), "output_channel": 128,
+                      'ffc': {'model': SimpleFFC(image_height=32, nc=1, lfu=True), "output_channel": 80,
                               "output_height": 2},
                       'ffc_resnet18': {'model': ffc_resnet18(), "output_channel": 512, "output_height": 1},
                       'ffc_resnet34': {'model': ffc_resnet34(), "output_channel": 512, "output_height": 1},

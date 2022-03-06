@@ -84,7 +84,7 @@ class SadriDataset(Dataset):
         return max_len, word_vocab
 
     def _preprocess_image_and_label(self, img, label):
-        img = preprocess_image(img=img, img_size=(self.img_w, self.img_h))
+        img = preprocess_image(img=img, img_size=(self.img_w, self.img_h), apply_augmentation=self.is_training_set)
         label = SadriDataset.wv.word_to_num(label=label)
 
         return {'image': img, 'label': label}

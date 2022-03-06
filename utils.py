@@ -48,8 +48,14 @@ def distortion_free_resize(img, img_size):
     return img
 
 
-def preprocess_image(img, img_size):
+def preprocess_image(img, img_size, apply_augmentation=False):
     img = distortion_free_resize(img, img_size=img_size)
+
+    if apply_augmentation:
+        img = torchvision.transforms.Compose([
+            torchvision.transforms.RandomErasing(p=0.5, scale=(0.02, 0.05), ratio=(0.3, 0.3), value=255)
+        ])(img)
+
     img = img / 255.
 
     return img
