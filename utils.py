@@ -53,7 +53,8 @@ def preprocess_image(img, img_size, apply_augmentation=False):
 
     if apply_augmentation:
         img = torchvision.transforms.Compose([
-            torchvision.transforms.RandomErasing(p=0.5, scale=(0.02, 0.05), ratio=(0.3, 0.3), value=255)
+            torchvision.transforms.RandomErasing(p=0.2, scale=(0.02, 0.05), ratio=(0.3, 0.3), value=255),
+            torchvision.transforms.GaussianBlur(kernel_size=(5, 9), sigma=(0.1, 2))
         ])(img)
 
     img = img / 255.
