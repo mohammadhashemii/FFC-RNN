@@ -72,10 +72,17 @@ class SeqCLR(object):
         # logging.info(f"Training with gpu: {self.args.disable_cuda}.")
 
         for epoch_counter in range(self.args.n_epochs):
+            total_loss = 0.0
+            total_acc_top1 = 0
+            total_acc_top5 = 0
+            n_total_samples = 0
+
             for images in tqdm(train_loader):
+
                 # print(images.size())
 
                 images = torch.cat(images, dim=0)
+                n_total_samples = len(train_loader) * len(images)
 
                 images = images.to(self.device, dtype=torch.float32)
 
@@ -90,8 +97,15 @@ class SeqCLR(object):
                 scaler.step(self.optimizer)
                 scaler.update()
                 n_iter += 1
-                print('loss', loss.item())
 
+                total_loss += loss.item()
+                top1, top5 = accuracy(logits, labels, topk=(1, 5))
+                total_acc_top1 += top1*len(logits)
+                total_acc_top5 += top5*len(logits)
+
+
+            print(f"[Epoch{epoch_counter}/{self.args.n_epochs}]: Loss: {total_loss/len(train_loader)},"
+                  f" Accuracy Top1: {total_acc_top1/n_total_samples}, Accuracy Top5: {total_acc_top5/n_total_samples}")
                 # if n_iter % self.args.log_every_n_steps == 0:
                 # top1, top5 = accuracy(logits, labels, topk=(1, 5))
                 # self.writer.add_scalar('loss', loss, global_step=n_iter)
@@ -106,7 +120,8 @@ class SeqCLR(object):
 
         # logging.info("Training has finished.")
         # save model checkpoints
-        checkpoint_name = 'checkpoint_{:04d}.pth.tar'.format(self.args.epochs)
+        checkpoint_path = os.path.join("checkpoint_last.pth")
+        torch.save(self.model.state_dict(), checkpoint_path)
         # save_checkpoint({
         #     'epoch': self.args.epochs,
         #     'arch': self.args.arch,
