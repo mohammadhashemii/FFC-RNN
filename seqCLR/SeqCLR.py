@@ -29,12 +29,16 @@ class SeqCLR(object):
 
     def info_nce_loss(self, features):
 
-        labels = torch.cat([torch.arange(self.args.batch_size) for i in range(self.args.n_views)], dim=0)
+        labels = torch.cat(
+            [torch.arange(self.args.batch_size * self.mapper.get_output_size()) for i in range(self.args.n_views)],
+            dim=0)
         labels = (labels.unsqueeze(0) == labels.unsqueeze(1)).float()
         # labels = (labels.unsqueeze(0) == labels.unsqueeze(1))
         # labels = torch.FloatTensor(labels)
         labels = labels.to(self.device)
 
+        # print(features.size())
+        # print(features.T.size())
         features = F.normalize(features, dim=1)
 
         similarity_matrix = torch.matmul(features, features.T)
@@ -78,7 +82,6 @@ class SeqCLR(object):
             n_total_samples = 0
 
             for images in tqdm(train_loader):
-
                 # print(images.size())
 
                 images = torch.cat(images, dim=0)
@@ -100,18 +103,17 @@ class SeqCLR(object):
 
                 total_loss += loss.item()
                 top1, top5 = accuracy(logits, labels, topk=(1, 5))
-                total_acc_top1 += top1*len(logits)
-                total_acc_top5 += top5*len(logits)
+                total_acc_top1 += top1 * len(logits)
+                total_acc_top5 += top5 * len(logits)
 
-
-            print(f"[Epoch{epoch_counter}/{self.args.n_epochs}]: Loss: {total_loss/len(train_loader)},"
-                  f" Accuracy Top1: {total_acc_top1/n_total_samples}, Accuracy Top5: {total_acc_top5/n_total_samples}")
-                # if n_iter % self.args.log_every_n_steps == 0:
-                # top1, top5 = accuracy(logits, labels, topk=(1, 5))
-                # self.writer.add_scalar('loss', loss, global_step=n_iter)
-                # self.writer.add_scalar('acc/top1', top1[0], global_step=n_iter)
-                # self.writer.add_scalar('acc/top5', top5[0], global_step=n_iter)
-                # self.writer.add_scalar('learning_rate', self.scheduler.get_lr()[0], global_step=n_iter)
+            print(f"[Epoch{epoch_counter}/{self.args.n_epochs}]: Loss: {total_loss / len(train_loader)},"
+                  f" Accuracy Top1: {total_acc_top1 / (n_total_samples * self.mapper.get_output_size())}, Accuracy Top5: {total_acc_top5 / (n_total_samples * self.mapper.get_output_size())}")
+            # if n_iter % self.args.log_every_n_steps == 0:
+            # top1, top5 = accuracy(logits, labels, topk=(1, 5))
+            # self.writer.add_scalar('loss', loss, global_step=n_iter)
+            # self.writer.add_scalar('acc/top1', top1[0], global_step=n_iter)
+            # self.writer.add_scalar('acc/top5', top5[0], global_step=n_iter)
+            # self.writer.add_scalar('learning_rate', self.scheduler.get_lr()[0], global_step=n_iter)
 
             # warmup for the first 10 epochs
             if epoch_counter >= 10:
@@ -120,7 +122,7 @@ class SeqCLR(object):
 
         # logging.info("Training has finished.")
         # save model checkpoints
-        checkpoint_path = os.path.join("checkpoint_last.pth")
+        checkpoint_path = os.path.join("/content/drive/MyDrive/CRNN/FFC-RNN/experiments/contrastive/adaptive/checkpoint_last.pth")
         torch.save(self.model.state_dict(), checkpoint_path)
         # save_checkpoint({
         #     'epoch': self.args.epochs,
