@@ -7,6 +7,7 @@ from torch.utils.data import DataLoader
 from seqCLR.SeqCLR import SeqCLR
 from seqCLR.InstanceMapper import InstanceMapper
 from seqCLR.contrastive_learning_dataset import ContrastiveLearningDataset
+
 # from data_aug.contrastive_learning_dataset import ContrastiveLearningDataset
 # from models.resnet_simclr import ResNetSimCLR
 # from simclr import SimCLR
@@ -31,7 +32,8 @@ parser.add_argument('--learning_rate', type=float, default=0.01, help='learning 
 parser.add_argument('--learning_rate_decay', type=float, default=0.1, help='learning rate decay steps')
 parser.add_argument('--momentum', type=float, default=0.9, help='momentum')
 parser.add_argument('--num_workers', type=int, default=2, help='number of workers')
-parser.add_argument('--fp16-precision', action='store_true', help='Whether or not to use 16-bit precision GPU training.')
+parser.add_argument('--fp16-precision', action='store_true',
+                    help='Whether or not to use 16-bit precision GPU training.')
 parser.add_argument('--n_views', type=int, default=2, help='number of views')
 parser.add_argument('--dataset_name', type=str, default='SadriDataset', help='path to the checkpoint')
 
@@ -61,12 +63,12 @@ def main():
 
     # model = ResNetSimCLR(base_model=args.arch, out_dim=args.out_dim)
     model = FFCRnn(nh=256,
-                   output_number=41,
+                   output_number=42,
                    n_rnn=args.n_rnn,
                    feature_extractor=args.feature_extractor,
                    use_attention=args.use_attention)
 
-    mapper = InstanceMapper()
+    mapper = InstanceMapper(output_size=8, sequence_length=32, mode='adaptive', avg_dim=1, reshape=True)
 
     optimizer = torch.optim.Adam(model.parameters(), args.learning_rate, weight_decay=0.0001)
 
