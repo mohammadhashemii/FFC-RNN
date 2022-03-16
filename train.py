@@ -24,6 +24,7 @@ parser.add_argument('--exp', required=True, type=str, help='experiments number e
 parser.add_argument('--resume', type=str, default=None, help='path to the checkpoint')
 parser.add_argument('--pretrained', default=False, action="store_true", help='use pretrained model')
 parser.add_argument('--finetune', default=False, action="store_true", help='fine-tune the model with lr=1e-5')
+parser.add_argument('--char_based', default=False, action="store_true", help='char based or word based vocabulary')
 parser.add_argument('--feature_extractor', type=str, required=True, help='feature extractor name (e.g. ffc_resnet18)')
 parser.add_argument('--use_attention', default=False, action="store_true", help='use attention layer')
 parser.add_argument('--n_rnn', type=int, default=3, help='number of LSTM layers')
@@ -45,8 +46,8 @@ if not os.path.exists(os.path.join(args.exp_dir, args.exp)):
 
 # load data and create data loaders
 img_size = (args.imgW, args.imgH)
-train_dataset = SadriDataset(root_dir=args.data_root, img_size=img_size, is_training_set=True)
-test_dataset = SadriDataset(root_dir=args.data_root, img_size=img_size, is_training_set=False)
+train_dataset = SadriDataset(root_dir=args.data_root, img_size=img_size, is_training_set=True, char_based=args.char_based)
+test_dataset = SadriDataset(root_dir=args.data_root, img_size=img_size, is_training_set=False, char_based=args.char_based)
 #visualize_samples(train_dataset, SadriDataset.wv.num_to_word, random_img=True, n_samples=20)
 
 
@@ -135,14 +136,17 @@ for epoch in range(args.n_epochs):
             optimizer.step()
             pbar.update(images.shape[0])
 
-            decoded_preds, indices_list = ctc_decode(log_probs.detach().clone(), 0, SadriDataset)
+            decoded_preds, indices_list = ctc_decode(log_probs.detach().clone(), 0, SadriDataset, char_based=args.char_based)
             target_lengths = torch.IntTensor([len(list(filter(lambda a: a != 0, t))) for t in labels])
             target_length_counter = 0
             for i in range(len(labels)):
                 label_indices = labels[i]
                 l = SadriDataset.wv.num_to_word(label_indices)
                 words = [w for w in l if w != '<unk>']
-                ground_truth_sentence = " ".join(words)
+                if args.char_based:
+                    ground_truth_sentence = "".join(words)
+                else:
+                    ground_truth_sentence = " ".join(words)
 
                 # update WER and SER metrics for one epoch
                 train_metric.update_metric(decoded_preds[i], ground_truth_sentence)
@@ -165,7 +169,7 @@ for epoch in range(args.n_epochs):
                 val_loss = compute_ctc_loss(log_probs, labels).item() // images.size(0)
                 epoch_val_loss_list.append(val_loss)
 
-                decoded_preds, indices_list = ctc_decode(log_probs, 0, SadriDataset)
+                decoded_preds, indices_list = ctc_decode(log_probs, 0, SadriDataset, char_based=args.char_based)
                 # target_lengths = torch.IntTensor([len(t) for t in labels])
                 target_lengths = torch.IntTensor([len(list(filter(lambda a: a != 0, t))) for t in labels])
                 target_length_counter = 0
@@ -173,7 +177,10 @@ for epoch in range(args.n_epochs):
                     label_indices = labels[i]
                     l = SadriDataset.wv.num_to_word(label_indices)
                     words = [w for w in l if w != '<unk>']
-                    ground_truth_sentence = " ".join(words)
+                    if args.char_based:
+                        ground_truth_sentence = "".join(words)
+                    else:
+                        ground_truth_sentence = " ".join(words)
 
                     # update WER and SER metrics for one epoch
                     val_metric.update_metric(decoded_preds[i], ground_truth_sentence)

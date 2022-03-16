@@ -100,7 +100,7 @@ def _reconstruct(labels, blank=0):
     return new_labels
 
 
-def beam_search_decode(emission_log_prob, blank, ds, **kwargs):
+def beam_search_decode(emission_log_prob, blank, ds, char_based=False, **kwargs):
     NINF = -1 * float('inf')
     DEFAULT_EMISSION_THRESHOLD = 0.01
 
@@ -142,12 +142,15 @@ def beam_search_decode(emission_log_prob, blank, ds, **kwargs):
     labels = labels_beams[0][0]
 
     words = [x for x in ds.wv.num_to_word(torch.IntTensor(labels)) if x != '<unk>']
-    joined = " ".join(words)
+    if char_based:
+        joined = "".join(words)
+    else:
+        joined = " ".join(words)
     
     return joined, labels
 
 
-def greedy_decoder(emission: torch.Tensor, blank, ds):
+def greedy_decoder(emission: torch.Tensor, blank, ds, char_based=False):
     """Given a sequence emission over labels, get the best path
     Args:
       emission (Tensor): Logit tensors. Shape `[num_seq, num_label]`.
@@ -161,12 +164,15 @@ def greedy_decoder(emission: torch.Tensor, blank, ds):
     indices = [i for i in indices if i != blank]
     # joined = "".join([self.labels[i] for i in indices])
     words = [x for x in ds.wv.num_to_word(torch.IntTensor(indices)) if x != '<unk>']
-    joined = " ".join(words)
+    if char_based:
+        joined = "".join(words)
+    else:
+        joined = " ".join(words)
 
     return joined, indices
 
 
-def ctc_decode(log_probs, blank, ds, beam_decode=False):
+def ctc_decode(log_probs, blank, ds, beam_decode=False, char_based=False):
     emission_log_probs = np.transpose(log_probs.cpu().numpy(), (1, 0, 2))
     # size of emission_log_probs: (batch, length, class)
 
@@ -174,9 +180,9 @@ def ctc_decode(log_probs, blank, ds, beam_decode=False):
     indices_list = []
     for emission_log_prob in emission_log_probs:
         if beam_decode:
-            decoded, indices = beam_search_decode(torch.Tensor(emission_log_prob), blank, ds)
+            decoded, indices = beam_search_decode(torch.Tensor(emission_log_prob), blank, ds, char_based=char_based)
         else:
-            decoded, indices = greedy_decoder(torch.Tensor(emission_log_prob), blank, ds)
+            decoded, indices = greedy_decoder(torch.Tensor(emission_log_prob), blank, ds, char_based=char_based)
         decoded_list.append(decoded)
         indices_list.append(indices)
     return decoded_list, indices_list
