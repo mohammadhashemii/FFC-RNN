@@ -76,7 +76,7 @@ def create_sentence_image(line_words_images_filename_list, words_base_path):
     return sentence_img
 
 
-def generate_sample(images_dir, labels_dir, sample_info: dict):
+def generate_sample(images_dir, labels_dir, sample_info: dict, mode='sentence'):
     if not os.path.exists(images_dir):
         os.mkdir(images_dir)
     if not os.path.exists(labels_dir):
@@ -84,18 +84,34 @@ def generate_sample(images_dir, labels_dir, sample_info: dict):
 
     line_words_images_filename_list = sample_info['line_words_images_filename_list']
     line_label_list = sample_info['line_label_list']
-    sentence_img = create_sentence_image(line_words_images_filename_list, words_base_path='../IAM/words')
-    ground_truth = ' '.join(line_label_list)
+    if mode == 'sentence':
+        img = create_sentence_image(line_words_images_filename_list, words_base_path='../IAM/words')
+        ground_truth = ' '.join(line_label_list)
 
-    # save the created sample
-    img_filename = '-'.join(line_words_images_filename_list[0].split('-')[:-1]) + '.png'
-    cv2.imwrite(os.path.join(images_dir, img_filename), sentence_img)
+        # save the created sample
+        img_filename = '-'.join(line_words_images_filename_list[0].split('-')[:-1]) + '.png'
+        cv2.imwrite(os.path.join(images_dir, img_filename), img)
 
-    # save the ground truth as a text file
-    label_filename = '-'.join(line_words_images_filename_list[0].split('-')[:-1]) + '.txt'
-    with open(os.path.join(labels_dir, label_filename), 'w') as f:
-        f.write(ground_truth)
-    f.close()
+        # save the ground truth as a text file
+        label_filename = '-'.join(line_words_images_filename_list[0].split('-')[:-1]) + '.txt'
+        with open(os.path.join(labels_dir, label_filename), 'w') as f:
+            f.write(ground_truth)
+        f.close()
+    elif mode == 'word':
+        for i, word_filename in enumerate(line_words_images_filename_list):
+            img = cv2.imread(os.path.join('../IAM/words', get_word_img_full_path(word_filename)))
+            ground_truth = line_label_list[i]
+            # save the created sample
+            img_filename = line_words_images_filename_list[i]
+            try:
+                cv2.imwrite(os.path.join(images_dir, img_filename), img)
+                # save the ground truth as a text file
+                label_filename = line_words_images_filename_list[i].split('.')[0] + '.txt'
+                with open(os.path.join(labels_dir, label_filename), 'w') as f:
+                    f.write(ground_truth)
+                f.close()
+            except cv2.error: # could not able to read the image
+                print(f"Could not save image: {word_filename}")
 
 
 def split_train_test_samples(train_uttlist_path, test_uttlist_path):
@@ -144,7 +160,7 @@ if __name__ == "__main__":
             # print some info for debugging purposes
             try:
                 generate_sample(images_dir='../IAM_dataset/images', labels_dir='../IAM_dataset/labels',
-                                sample_info=line_dict)
+                                sample_info=line_dict, mode='word')
             except AttributeError:
                 print(f"{line_dict['line_words_images_filename_list'][0]}: {' '.join(line_dict['line_label_list'])} ")
     
