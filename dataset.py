@@ -131,6 +131,7 @@ class WordVocabulary:
     def word_to_num(self, label):
         if self.char_based:
             label = list(label)
+            label = [l for l in label if l != ' ']
         else:
             label = label.split(' ')
         # enl = self.le.batch_encode(label)

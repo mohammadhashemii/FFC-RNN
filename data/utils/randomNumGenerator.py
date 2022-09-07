@@ -47,51 +47,51 @@ def generate_random_num():
     tn = []
 
     # print("5-digit: 10,000 - 11,000 - ... - 19,000 ###############################################################")
-    tn.append(sorted(random_n_base(4, 20, start=10, count=100)))
+    tn.append(sorted(random_n_base(4, 20, start=10, count=1500)))
     # print(tn[-1]) #5 digits               10,000 - 11,000 - ... - 19,000
 
     # print("5-digit: 20,000 - 30,000 - ... - 90,000 ###############################################################")
-    tn.append(sorted(random_n_base(4, 91, start=20, step=10, count=100)))
+    tn.append(sorted(random_n_base(4, 91, start=20, step=10, count=1500)))
     # print(tn[-1])  # 5 digits    20,000 - 30,000 - ... - 90,000
 
     # print("6-digit: 100,000 - 200,000 - ... - 900,000 ###############################################################")
-    tn.append(sorted(random_n_base(6, 10, count=100)))
+    tn.append(sorted(random_n_base(6, 10, count=1000)))
     # print(tn[-1])             #6 digits               100,000 - 200,000 - ... - 900,000
 
     # print("7-digit: 1,000,000 - 2,000,000 - ... - 9,000,000 ###############################################################")
-    tn.append(sorted(random_n_base(7, 10, count=100)))
+    tn.append(sorted(random_n_base(7, 10, count=700)))
     # print(tn[-1]) #7 digits               1,000,000 - 2,000,000 - ... - 9,000,000
 
     # print("8-digit: 10,000,000 - 11,000,000 - ... - 19,000,000 ###############################################################")
-    tn.append(sorted(random_n_base(7, 20, start=10, count=100)))
+    tn.append(sorted(random_n_base(7, 20, start=10, count=700)))
     # print(tn[-1])             #8 digits               10,000,000 - 11,000,000 - ... - 19,000,000
 
     # print("8-digit: 20,000,000 - 30,000,000 - ... - 90,000,000 ###############################################################")
-    tn.append(sorted(random_n_base(7, 91, start=20, step=10, count=100)))
+    tn.append(sorted(random_n_base(7, 91, start=20, step=10, count=700)))
     # print(tn[-1])  # 8 digits               20,000,000 - 30,000,000 - ... - 90,000,000
 
     # print("9-digit: 100,000,000 - 200,000,000 - ... - 900,000,000 ###############################################################")
-    tn.append(sorted(random_n_base(9, 10, count=100)))
+    tn.append(sorted(random_n_base(9, 10, count=700)))
     # print(tn[-1])             #9 digits               100,000,000 - 200,000,000 - ... - 900,000,000
 
     # print("10-digit: 1,000,000,000 - 2,000,000,000 - ... - 9,000,000,000 ###############################################################")
-    tn.append(sorted(random_n_base(10, 10, count=100)))
+    tn.append(sorted(random_n_base(10, 10, count=700)))
     # print(tn[-1])#10 digits              1,000,000,000 - 2,000,000,000 - ... - 9,000,000,000
 
     # print("11-digit: 10,000,000,000 - 11,000,000,000 - ... - 19,000,000,000 ###############################################################")
-    tn.append(sorted(random_n_base(10, 20, start=10, count=100)))
+    tn.append(sorted(random_n_base(10, 20, start=10, count=700)))
     # print(tn[-1])            #11 digits              10,000,000,000 - 11,000,000,000 - ... - 19,000,000,000
 
     # print("11-digit: 20,000,000,000 - 30,000,000,000 - ... - 90,000,000,000 ###############################################################")
-    tn.append(sorted(random_n_base(10, 91, start=20, step=10, count=100)))
+    tn.append(sorted(random_n_base(10, 91, start=20, step=10, count=700)))
     # print(tn[-1])  # 11 digits              20,000,000,000 - 30,000,000,000 - ... - 90,000,000,000
 
     # print("12-digit: 100,000,000,000 - 200,000,000,000 - ... - 900,000,000,000 ###############################################################")
-    tn.append(sorted(random_n_base(12, 10, count=100)))
+    tn.append(sorted(random_n_base(12, 10, count=700)))
     # print(tn[-1])            #12 digits              100,000,000,000 - 200,000,000,000 - ... - 900,000,000,000
 
     # print("with zeros:")
-    tn.append(sorted(random_n_base(4, count=150, mode="with_zeros")))
+    tn.append(sorted(random_n_base(4, count=3000, mode="with_zeros")))
     # print(tn[-1])
 
     output = []

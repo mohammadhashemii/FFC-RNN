@@ -56,7 +56,7 @@ def create_num_image(num_string, words_base_path='../data/train_words/'):
         word_img_list.insert(0, word_img)
         labels.insert(0, str(word))
 
-    num_string_image = hconcat_resize(word_img_list, labels, padding=False)
+    num_string_image = hconcat_resize(word_img_list, labels, padding=True)
 
     return num_string_image
 
@@ -77,9 +77,9 @@ def generate_images(images_dir, labels_dir):
         os.mkdir(labels_dir)
 
     # fetch the random numbers generated via randomNumGenerator.py script
-    random_numbers = read_nums_from_excel(path='../CourtesyValues.xlsx')
-    #random_numbers = randomNumGenerator.generate_random_num()
-    #random.shuffle(random_numbers)
+    #random_numbers = read_nums_from_excel(path='../CourtesyValues.xlsx')
+    random_numbers = randomNumGenerator.generate_random_num()
+    random.shuffle(random_numbers)
 
     train_samples, test_samples = train_test_split(random_numbers, test_size=0.1)
 
@@ -94,7 +94,7 @@ def generate_images(images_dir, labels_dir):
         print('{0}/{1}: {2}'.format(idx, len(random_numbers), num))
         num_string = num2word.convert(num)
         num_string += " ریال"
-        num_img = create_num_image(num_string, words_base_path='../OurDataset/train_words/')
+        num_img = create_num_image(num_string, words_base_path='../SadriDataset/train_words/')
         # convert the raw image to a binary one
         (threshold, num_img) = cv2.threshold(num_img, 127, 255, cv2.THRESH_BINARY)
 
@@ -121,7 +121,7 @@ def generate_images(images_dir, labels_dir):
         print('{0}/{1}: {2}'.format(idx, len(random_numbers), num))
         num_string = num2word.convert(num)
         num_string += " ریال"
-        num_img = create_num_image(num_string, words_base_path='../OurDataset/test_words/')
+        num_img = create_num_image(num_string, words_base_path='../SadriDataset/test_words/')
         # convert the raw image to a binary one
         (threshold, num_img) = cv2.threshold(num_img, 127, 255, cv2.THRESH_BINARY)
 
@@ -144,11 +144,11 @@ def generate_images(images_dir, labels_dir):
     print("Number of repeated images:{}".format(repeated_imgs))
 
     print('Creating train.txt and test.txt list files...')
-    f = open('../OurDataset/train.txt', 'w')
+    f = open('../SadriDataset/train.txt', 'w')
     for sample in train_samples:
         f.write(str(sample) + '.jpg' + '\n')
 
-    f = open('../OurDataset/test.txt', 'w')
+    f = open('../SadriDataset/test.txt', 'w')
     for sample in test_samples:
         f.write(str(sample) + '.jpg' + '\n')
     f.close()
@@ -185,6 +185,21 @@ def split_words_to_train_test(test_size=0.1, train_path="../data/train_words/", 
 
 
 if __name__ == '__main__':
-    generate_images(images_dir='../OurDataset/images/', labels_dir='../OurDataset/labels/')
+    generate_images(images_dir='../SadriDataset/images/', labels_dir='../SadriDataset/labels/')
     #split_words_to_train_test(test_size=0.1, train_path="../OurDataset/train_words/", test_path="../OurDataset/test_words/")
     #print(num2word.convert(1111123))
+    '''
+    all_images_in_directory = os.listdir("../SadriDataset/images")
+    if ".DS_Store" in all_images_in_directory: all_images_in_directory.remove(".DS_Store")
+    train_samples, test_samples = train_test_split(all_images_in_directory, test_size=0.15, random_state=0)
+    print(len(train_samples), len(test_samples))
+    f = open('../OurDataset/train.txt', 'w')
+    for sample in train_samples:
+        f.write(str(sample) + '\n')
+
+    f = open('../OurDataset/test.txt', 'w')
+    for sample in test_samples:
+        f.write(str(sample) + '\n')
+    f.close()
+    '''
+

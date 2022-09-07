@@ -115,6 +115,7 @@ print(f"Training configs:\n {training_configs}")
 epoch_train_loss_list = []
 epoch_val_loss_list = []
 least_ser = None
+least_wer = None
 for epoch in range(args.n_epochs):
     ############## Training ##############
     ffc_rnn.train()
@@ -149,11 +150,15 @@ for epoch in range(args.n_epochs):
                     ground_truth_sentence = " ".join(words)
 
                 # update WER and SER metrics for one epoch
-                train_metric.update_metric(decoded_preds[i], ground_truth_sentence)
+                train_metric.update_metric(decoded_preds[i], ground_truth_sentence, char_based=args.char_based)
 
         avg_train_loss = torch.mean(torch.tensor(epoch_train_loss_list))
-        train_wer = train_metric.wer
-        train_ser = train_metric.ser
+        if not args.char_based:
+            train_wer = train_metric.wer
+            train_ser = train_metric.ser
+        else:
+            train_wer = train_metric.wer
+            train_cer = train_metric.cer
 
         ############## validation ##############
         ffc_rnn.eval()
@@ -183,11 +188,16 @@ for epoch in range(args.n_epochs):
                         ground_truth_sentence = " ".join(words)
 
                     # update WER and SER metrics for one epoch
-                    val_metric.update_metric(decoded_preds[i], ground_truth_sentence)
+                    val_metric.update_metric(decoded_preds[i], ground_truth_sentence, char_based=args.char_based)
 
         avg_val_loss = torch.mean(torch.tensor(epoch_val_loss_list))
-        val_wer = val_metric.wer
-        val_ser = val_metric.ser
+
+        if not args.char_based:
+            val_wer = val_metric.wer
+            val_ser = val_metric.ser
+        else:
+            val_wer = val_metric.wer
+            val_cer = val_metric.cer
 
         # schedule the LR
         scheduler.step()
@@ -197,7 +207,10 @@ for epoch in range(args.n_epochs):
         with open(log_file_path, "a") as f:
             epoch_msg = f"Epoch: {epoch}"
             loss_msg = f"\nTrain CTC loss: {round(avg_train_loss.item(), 2)}, Val CTC loss:{round(avg_val_loss.item(), 2)}"
-            metric_msg = f"Train SER: {round(100 * train_ser, 2)}\tTrain WER:{round(100 * train_wer, 2)}\tVal SER: {round(100 * val_ser, 2)}\tVal WER:{round(100 * val_wer, 2)}"
+            if not args.char_based:
+                metric_msg = f"Train SER: {round(100 * train_ser, 2)}\tTrain WER:{round(100 * train_wer, 2)}\tVal SER: {round(100 * val_ser, 2)}\tVal WER:{round(100 * val_wer, 2)}"
+            else:
+                metric_msg = f"Train CER: {round(100 * train_cer, 2)}\tTrain WER:{round(100 * train_wer, 2)}\tVal CER: {round(100 * val_cer, 2)}\tVal WER:{round(100 * val_wer, 2)}"
             print(f"{epoch_msg}\t{loss_msg}\n{metric_msg}\n")
             f.write(f"{epoch_msg}\t{loss_msg}\n{metric_msg}\n")
         f.close()
@@ -205,9 +218,15 @@ for epoch in range(args.n_epochs):
         # do checkpointing
         if not os.path.exists(os.path.join(args.exp_dir, args.exp, 'checkpoints')):
             os.makedirs(os.path.join(args.exp_dir, args.exp, 'checkpoints'))
-        if least_ser is None or val_ser < least_ser:
-            checkpoint_path = os.path.join(args.exp_dir, args.exp, 'checkpoints', f"checkpoint_best.pth")
-            torch.save(ffc_rnn.state_dict(), checkpoint_path)
-            least_ser = val_ser
+        if not args.char_based:
+            if least_ser is None or val_ser < least_ser:
+                checkpoint_path = os.path.join(args.exp_dir, args.exp, 'checkpoints', f"checkpoint_best.pth")
+                torch.save(ffc_rnn.state_dict(), checkpoint_path)
+                least_ser = val_ser
+        else:
+            if least_wer is None or val_wer < least_wer:
+                checkpoint_path = os.path.join(args.exp_dir, args.exp, 'checkpoints', f"checkpoint_best.pth")
+                torch.save(ffc_rnn.state_dict(), checkpoint_path)
+                least_wer = val_wer
         checkpoint_path = os.path.join(args.exp_dir, args.exp, 'checkpoints', f"checkpoint_last.pth")
         torch.save(ffc_rnn.state_dict(), checkpoint_path)

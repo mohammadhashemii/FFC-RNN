@@ -122,13 +122,13 @@ class CNN(nn.Module):
         cnn.add_module('pooling{0}'.format(0), nn.MaxPool2d(2, 2))  # (64, img_height // 2, img_width // 2)
         conv_relu(1, batch_normalization=True, dropout=False)
         cnn.add_module('pooling{0}'.format(1), nn.MaxPool2d(2, 2))  # (128, img_height // 4, img_width // 4)
-        conv_relu(2, batch_normalization=True, dropout=False)
+        conv_relu(2, batch_normalization=True, dropout=True)
         cnn.add_module('pooling{0}'.format(2), nn.MaxPool2d((2, 2)))  # (256, img_height // 8, img_width // 4)
         conv_relu(3, batch_normalization=True, dropout=True)
         cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((1, 2)))  # 256 x 4 x 16
-        conv_relu(4, batch_normalization=True, dropout=True)
-        cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((2, 1)))
-        conv_relu(5, batch_normalization=False, dropout=True)
+        conv_relu(4, batch_normalization=False, dropout=True)
+        #cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((2, 1)))
+        #conv_relu(5, batch_normalization=False, dropout=True)
 
         # cnn.add_module('pooling{0}'.format(3), nn.MaxPool2d((1, 2)))
         # conv_relu(5)
@@ -155,7 +155,7 @@ class BiLSTM(nn.Module):
         return recurrent
 
 
-FEATURE_EXTRACTORS = {'cnn': {'model': CNN(image_height=32, nc=1), "output_channel": 128, "output_height": 2},
+FEATURE_EXTRACTORS = {'cnn': {'model': CNN(image_height=32, nc=1), "output_channel": 80, "output_height": 4},
                       'ffc': {'model': SimpleFFC(image_height=32, nc=1, lfu=True), "output_channel": 80,
                               "output_height": 2},
                       'ffc_resnet18': {'model': ffc_resnet18(), "output_channel": 512, "output_height": 1},

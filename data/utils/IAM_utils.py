@@ -4,12 +4,22 @@ import cv2
 import random
 random.seed(123)
 
-def get_xml_filenames(uttlist_path: str):
+
+def get_xml_filenames(uttlist_path):
     with open(uttlist_path, "r") as f:
         lines = [line.rstrip('\n')+'.xml' for line in f]
 
     return lines
 
+def create_word_parts_dict(to_be_parsed: str):
+    # a sample of to_be_parsed : 'a01-000u-00-00 ok 154 408 768 27 51 AT A'
+    parts = to_be_parsed.split(" ")
+    my_dict = {}
+
+    my_dict['image_filename'] = parts[0]
+    my_dict['text'] = ' '.join(parts[8:])
+
+    return my_dict
 
 def parse_xml_to_read_lines(xml_path: str):
     with open(xml_path, 'r', encoding='utf-8') as file:
@@ -82,8 +92,8 @@ def generate_sample(images_dir, labels_dir, sample_info: dict, mode='sentence'):
     if not os.path.exists(labels_dir):
         os.mkdir(labels_dir)
 
-    line_words_images_filename_list = sample_info['line_words_images_filename_list']
-    line_label_list = sample_info['line_label_list']
+    word_filename = sample_info['image_filename']
+    word_text = sample_info['text']
     if mode == 'sentence':
         img = create_sentence_image(line_words_images_filename_list, words_base_path='../IAM/words')
         ground_truth = ' '.join(line_label_list)
@@ -98,20 +108,18 @@ def generate_sample(images_dir, labels_dir, sample_info: dict, mode='sentence'):
             f.write(ground_truth)
         f.close()
     elif mode == 'word':
-        for i, word_filename in enumerate(line_words_images_filename_list):
-            img = cv2.imread(os.path.join('../IAM/words', get_word_img_full_path(word_filename)))
-            ground_truth = line_label_list[i]
-            # save the created sample
-            img_filename = line_words_images_filename_list[i]
-            try:
-                cv2.imwrite(os.path.join(images_dir, img_filename), img)
-                # save the ground truth as a text file
-                label_filename = line_words_images_filename_list[i].split('.')[0] + '.txt'
-                with open(os.path.join(labels_dir, label_filename), 'w') as f:
-                    f.write(ground_truth)
-                f.close()
-            except cv2.error: # could not able to read the image
-                print(f"Could not save image: {word_filename}")
+        img = cv2.imread(os.path.join('../IAM/words', get_word_img_full_path(word_filename + '.png')))
+        ground_truth = word_text
+        # save the created sample
+        try:
+            cv2.imwrite(os.path.join(images_dir, word_filename + '.png'), img)
+            # save the ground truth as a text file
+            label_filename = word_filename + '.txt'
+            with open(os.path.join(labels_dir, label_filename), 'w') as f:
+                f.write(ground_truth)
+            f.close()
+        except cv2.error: # could not able to read the image
+            print(f"Could not save image: {word_filename}")
 
 
 def split_train_test_samples(train_uttlist_path, test_uttlist_path):
@@ -146,24 +154,44 @@ def split_train_test_samples(train_uttlist_path, test_uttlist_path):
     test_file.close()
 
 
-if __name__ == "__main__":
+#if __name__ == "__main__":
 
-    print('Reading XML files...')
-    xml_filenames = get_xml_filenames(uttlist_path='../IAM/splits/train_val_test.uttlist')
-    print('Generating samples...')
-    print('=====================')
-    print('The following samples are removed from the final dataset:')
-    for xf in xml_filenames:
-        line_lists = parse_xml_to_read_lines(xml_path=os.path.join('../IAM/xml/', xf))
-        for line_dict in line_lists:
+with open('../IAM/splits/train_val_test.uttlist', "r") as f:
+    xml_filenames = [line.rstrip('\n') for line in f]
 
-            # print some info for debugging purposes
-            try:
-                generate_sample(images_dir='../IAM_dataset/images', labels_dir='../IAM_dataset/labels',
-                                sample_info=line_dict, mode='word')
-            except AttributeError:
-                print(f"{line_dict['line_words_images_filename_list'][0]}: {' '.join(line_dict['line_label_list'])} ")
-    
 
-    split_train_test_samples(train_uttlist_path='../IAM/splits/train_val.uttlist',
-                             test_uttlist_path='../IAM/splits/test.uttlist')
+with open('../IAM/ascii/words.txt', "r") as f:
+    # just read words with "ok" tags
+    words_info_list = [line.rstrip('\n') for line in f if (line.split(" ")[1] == 'ok' and
+                                                           '-'.join(line.split(" ")[0].split("-")[:2]) in xml_filenames)]
+    print(f"Total recognized samples: {len(words_info_list)}")
+
+print('Generating samples...')
+print('=====================')
+print('The following samples are removed from the final dataset:')
+for wi in words_info_list:
+    words_parts = create_word_parts_dict(to_be_parsed=wi)
+    try:
+        generate_sample(images_dir='../IAM_dataset/images', labels_dir='../IAM_dataset/labels',
+                        sample_info=words_parts, mode='word')
+    except AttributeError:
+        print(f"{words_parts['image_path']}: {words_parts['text']}")
+
+
+
+split_train_test_samples(train_uttlist_path='../IAM/splits/train_val.uttlist',
+                         test_uttlist_path='../IAM/splits/test.uttlist')
+
+
+with open('../IAM_dataset/train.txt', "r") as f:
+    # just read words with "ok" tags
+    train_files = [line.rstrip('\n') for line in f]
+with open('../IAM_dataset/test.txt', "r") as f:
+    # just read words with "ok" tags
+    test_files = [line.rstrip('\n') for line in f]
+
+files = train_files + test_files
+
+for img in os.listdir('../IAM_dataset/images/'):
+    if img not in files:
+        print(img)
