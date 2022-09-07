@@ -6,7 +6,7 @@ This is a PyTorch Implementation of FFC-RNN (Fast Fourier Convolution + RNN) wit
 
 ## Dataset
 <p align="center">
-  <img src="https://github.com/mohammadhashemii/FFC-RNN/img/9980000000_2.jpg">	
+  <img src="https://github.com/mohammadhashemii/FFC-RNN/blob/main/img/9980000000_2.jpg">	
 </p>
 This project aimed to perform handwritten recognition on Persian numbers written in text. In this way, we used specific parts(those containing numbers) of [Sadri Dataset](https://users.encs.concordia.ca/~j_sadri/PersianDatabase.htm). This work has also been tested on [IAM dataset](https://fki.tic.heia-fr.ch/databases/iam-handwriting-database). In order to run the code and train the model on your own data, you must create a directory similar to the one shown below and manipulate the code written in `dataset.py`:
 
